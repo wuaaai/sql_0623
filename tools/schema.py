@@ -1,7 +1,7 @@
 """
 Text-to-SQL 工具 Schema 定义 (OpenAI function-calling 格式)
 
-阶段1: connect_db, list_tables, run_sql
+阶段1: connect_db, list_tables, run_sql, describe_table, search_schema
 """
 
 TOOLS_SCHEMA = [
@@ -73,6 +73,40 @@ TOOLS_SCHEMA = [
                     }
                 },
                 "required": ["sql"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "describe_table",
+            "description": "查看指定表的结构：列名、数据类型、是否可空。同时返回一行样例数据帮助理解内容。用户描述模糊时先用此工具确认表结构。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table_name": {
+                        "type": "string",
+                        "description": "表名"
+                    }
+                },
+                "required": ["table_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_schema",
+            "description": "按关键词搜索表名和列名。当用户用模糊的中文描述（如'支出相关的表'、'金额列'）而你不知道具体表名/列名时使用。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "keyword": {
+                        "type": "string",
+                        "description": "搜索关键词（中文或英文），会在表名和列名中进行模糊匹配"
+                    }
+                },
+                "required": ["keyword"]
             }
         }
     }

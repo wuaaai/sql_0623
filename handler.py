@@ -8,7 +8,7 @@ dispatch(tool_name, args) → do_<tool_name>(args) → StepOutcome
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from tools import db_connection, db_query
+from tools import db_connection, db_query, db_schema
 
 
 @dataclass
@@ -105,6 +105,62 @@ class TextToSQLHandler(BaseHandler):
                 data=result,
                 next_prompt=f"SQL 执行失败: {result['message']}\n"
                             f"请检查SQL语句是否正确，或使用 list_tables 确认表名。"
+            )
+
+    def do_describe_table(self, args: dict) -> StepOutcome:
+        result = db_schema.describe_table(args["table_name"])
+
+        if result["status"] == "success":
+            cols_desc = "\n".join(
+                f"- {c['name']} ({c['type']}){' NULL' if c.get('nullable') else ' NOT NULL'}"
+                for c in result["columns"]
+            )
+            sample = ""
+            if result.get("sample_row"):
+                sample = f"\n样例数据: {result['sample_row']}"
+
+            return StepOutcome(
+                data=result,
+                next_prompt=f"表 {result['table_name']} 的结构（{result['column_count']}列）:\n{cols_desc}{sample}\n"
+                            f"现在可以根据列结构回答用户问题了。"
+            )
+        else:
+            return StepOutcome(
+                data=result,
+                next_prompt=f"获取表结构失败: {result['message']}\n"
+                            f"请用 list_tables 确认表名是否正确。"
+            )
+
+    def do_search_schema(self, args: dict) -> StepOutcome:
+        keyword = args["keyword"]
+        result = db_schema.search_schema(keyword)
+
+        if result["status"] == "success":
+            tables = result.get("matched_tables", [])
+            columns = result.get("matched_columns", [])
+
+            msg = f"搜索 '{keyword}' 的结果:\n"
+            if tables:
+                msg += f"\n匹配的表 ({len(tables)}): {', '.join(tables[:15])}"
+                if len(tables) > 15:
+                    msg += f" ... 还有{len(tables)-15}张"
+            if columns:
+                msg += f"\n匹配的列 ({len(columns)}): "
+                col_strs = [f"{c['table']}.{c['column']}({c['type']})" for c in columns[:10]]
+                msg += ", ".join(col_strs)
+                if len(columns) > 10:
+                    msg += f" ... 还有{len(columns)-10}列"
+            if not tables and not columns:
+                msg += "\n未找到匹配的表或列，建议尝试其他关键词。"
+
+            return StepOutcome(
+                data=result,
+                next_prompt=msg + "\n请根据搜索结果帮助用户找到正确的表。"
+            )
+        else:
+            return StepOutcome(
+                data=result,
+                next_prompt=f"搜索失败: {result['message']}"
             )
 
 
