@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Text-to-SQL Agent</title>
+  <!-- Element Plus -->
+  <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
+  <!-- Highlight.js for SQL -->
+  <link rel="stylesheet" href="https://unpkg.com/highlight.js@11/styles/github-dark.min.css" />
+  <style>
+    :root {
+      --primary: #409eff;
+      --bg: #f5f7fa;
+      --sidebar-bg: #ffffff;
+      --chat-bg: #f0f2f5;
+      --bubble-user: #409eff;
+      --bubble-ai: #ffffff;
+      --border: #e4e7ed;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #app {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* ====== 侧边栏 ====== */
+    .sidebar {
+      width: 320px;
+      min-width: 320px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: width 0.3s, min-width 0.3s;
+    }
+
+    .sidebar.collapsed {
+      width: 0;
+      min-width: 0;
+      border-right: none;
+    }
+
+    .sidebar-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sidebar-header h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #303133;
+    }
+
+    .sidebar-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    .sidebar-section {
+      margin-bottom: 20px;
+    }
+
+    .sidebar-section h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #909399;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+
+    .table-item {
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #606266;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .table-item:hover {
+      background: #ecf5ff;
+      color: var(--primary);
+    }
+
+    .table-item .el-icon { font-size: 16px; }
+
+    .table-count {
+      font-size: 12px;
+      color: #909399;
+      margin-left: auto;
+    }
+
+    /* ====== 主聊天区 ====== */
+    .main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--chat-bg);
+      min-width: 0;
+    }
+
+    .chat-header {
+      padding: 12px 24px;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .chat-header .toggle-btn {
+      cursor: pointer;
+      font-size: 18px;
+      color: #606266;
+      padding: 4px;
+      border-radius: 4px;
+    }
+
+    .chat-header .toggle-btn:hover { background: #f0f2f5; }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .status-dot.connected { background: #67c23a; }
+    .status-dot.disconnected { background: #f56c6c; }
+
+    /* ====== 消息列表 ====== */
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      display: flex;
+      gap: 12px;
+      max-width: 85%;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.user {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+
+    .message.assistant {
+      align-self: flex-start;
+    }
+
+    .msg-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .message.user .msg-avatar {
+      background: var(--bubble-user);
+      color: #fff;
+    }
+
+    .message.assistant .msg-avatar {
+      background: #e6f7ff;
+      color: var(--primary);
+    }
+
+    .msg-bubble {
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.7;
+      word-break: break-word;
+    }
+
+    .message.user .msg-bubble {
+      background: var(--bubble-user);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.assistant .msg-bubble {
+      background: var(--bubble-ai);
+      color: #303133;
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    /* SQL 代码块 */
+    .sql-block {
+      margin: 12px 0;
+      background: #1e1e1e;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .sql-block-header {
+      padding: 8px 16px;
+      background: #2d2d2d;
+      color: #abb2bf;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sql-block code {
+      display: block;
+      padding: 16px;
+      font-family: "Fira Code", "Cascadia Code", Consolas, monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-x: auto;
+    }
+
+    .copy-btn {
+      cursor: pointer;
+      color: #abb2bf;
+      font-size: 12px;
+      background: none;
+      border: 1px solid #555;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .copy-btn:hover { color: #fff; border-color: #fff; }
+
+    /* 结果表格 */
+    .result-table-wrap {
+      margin: 12px 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .result-table-header {
+      padding: 8px 16px;
+      background: #fafafa;
+      font-size: 12px;
+      color: #909399;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .result-table {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    .result-table table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .result-table th {
+      background: #fafafa;
+      padding: 10px 12px;
+      text-align: left;
+      font-weight: 600;
+      color: #606266;
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .result-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #ebeef5;
+      color: #303133;
+      max-width: 300px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .result-table tr:hover td { background: #f5f7fa; }
+
+    /* 输入区 */
+    .chat-input-area {
+      padding: 16px 24px;
+      background: #fff;
+      border-top: 1px solid var(--border);
+    }
+
+    .chat-input-area .el-input__wrapper {
+      border-radius: 8px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+
+    .input-row .el-input { flex: 1; }
+
+    /* 空状态 */
+    .empty-chat {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #909399;
+    }
+
+    .empty-chat .el-icon { font-size: 64px; color: #dcdfe6; margin-bottom: 16px; }
+
+    .empty-chat h3 { font-size: 18px; margin-bottom: 8px; color: #606266; }
+
+    .empty-chat p { font-size: 13px; }
+
+    /* loading */
+    .typing-dots {
+      display: flex;
+      gap: 4px;
+      padding: 4px 0;
+    }
+
+    .typing-dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #909399;
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+
+    .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <!-- 侧边栏 -->
+  <aside class="sidebar" :class="{ collapsed: !sidebarOpen }">
+    <div class="sidebar-header">
+      <h2>Text-to-SQL</h2>
+      <el-button link @click="sidebarOpen = false">
+        <el-icon><Close /></el-icon>
+      </el-button>
+    </div>
+    <div class="sidebar-body">
+      <!-- 数据库连接 -->
+      <div class="sidebar-section">
+        <h3>数据库连接</h3>
+        <el-form :model="connForm" label-position="top" size="small">
+          <el-form-item label="类型">
+            <el-select v-model="connForm.db_type" style="width:100%">
+              <el-option label="达梦 (Dameng)" value="dameng" />
+              <el-option label="MySQL" value="mysql" />
+              <el-option label="SQLite" value="sqlite" />
+            </el-select>
+          </el-form-item>
+          <template v-if="connForm.db_type !== 'sqlite'">
+            <el-row :gutter="8">
+              <el-col :span="16">
+                <el-form-item label="主机">
+                  <el-input v-model="connForm.host" placeholder="localhost" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="端口">
+                  <el-input v-model.number="connForm.port" placeholder="5236" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-form-item label="用户名">
+              <el-input v-model="connForm.user" placeholder="SYSDBA" />
+            </el-form-item>
+            <el-form-item label="密码">
+              <el-input v-model="connForm.password" type="password" show-password placeholder="密码" />
+            </el-form-item>
+            <el-form-item label="模式 (Schema)">
+              <el-input v-model="connForm.schema" placeholder="RDYS_PUBLIC_TBS" />
+            </el-form-item>
+          </template>
+          <el-form-item v-if="connForm.db_type === 'sqlite'" label="文件路径">
+            <el-input v-model="connForm.database" placeholder="temp/test.db" />
+          </el-form-item>
+          <el-button type="primary" @click="doConnect" :loading="connecting" style="width:100%">
+            {{ connecting ? '连接中...' : '连接数据库' }}
+          </el-button>
+        </el-form>
+        <div style="margin-top:8px;font-size:12px;color:#909399;">
+          <span class="status-dot" :class="connected ? 'connected' : 'disconnected'"></span>
+          {{ connected ? '已连接' : '未连接' }}
+        </div>
+      </div>
+
+      <!-- 表列表 -->
+      <div class="sidebar-section" v-if="tables.length > 0">
+        <h3>数据表 ({{ tables.length }})</h3>
+        <div
+          v-for="t in tables" :key="t"
+          class="table-item"
+          @click="quickQuery(t)"
+        >
+          <el-icon><Grid /></el-icon>
+          <span>{{ t }}</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 主区域 -->
+  <div class="main-area">
+    <header class="chat-header">
+      <span class="toggle-btn" v-if="!sidebarOpen" @click="sidebarOpen = true">
+        <el-icon><Expand /></el-icon>
+      </span>
+      <span style="font-weight:600;color:#303133;">SQL 查询助手</span>
+      <span style="font-size:12px;color:#909399;margin-left:auto;">
+        达梦 · {{ model || 'gpt-4o' }}
+      </span>
+    </header>
+
+    <!-- 消息列表 -->
+    <div class="chat-messages" ref="msgContainer" v-if="messages.length > 0">
+      <div
+        v-for="(msg, idx) in messages" :key="idx"
+        class="message"
+        :class="msg.role"
+      >
+        <div class="msg-avatar">
+          <el-icon v-if="msg.role === 'user'"><User /></el-icon>
+          <el-icon v-else><Cpu /></el-icon>
+        </div>
+        <div class="msg-bubble">
+          <!-- 用户消息 -->
+          <template v-if="msg.role === 'user'">
+            {{ msg.content }}
+          </template>
+
+          <!-- AI 文字回答 -->
+          <template v-if="msg.role === 'assistant' && msg.answer_text">
+            <div v-html="renderMarkdown(msg.answer_text)"></div>
+          </template>
+
+          <!-- SQL 块 -->
+          <div v-if="msg.sql" class="sql-block">
+            <div class="sql-block-header">
+              <span>SQL 查询</span>
+              <button class="copy-btn" @click="copySQL(msg.sql)">复制</button>
+            </div>
+            <code v-html="highlightSQL(msg.sql)"></code>
+          </div>
+
+          <!-- 结果表格 -->
+          <div v-if="msg.columns && msg.columns.length" class="result-table-wrap">
+            <div class="result-table-header">
+              查询结果 ({{ msg.row_count || msg.rows?.length || 0 }} 行)
+            </div>
+            <div class="result-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th v-for="col in msg.columns" :key="col">{{ col }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, ri) in (msg.rows || []).slice(0, 20)" :key="ri">
+                    <td v-for="col in msg.columns" :key="col">
+                      {{ row[col] !== null ? row[col] : 'NULL' }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- loading -->
+          <div v-if="msg.loading" class="typing-dots">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 空状态 -->
+    <div class="empty-chat" v-else>
+      <el-icon><ChatLineSquare /></el-icon>
+      <h3>Text-to-SQL 助手</h3>
+      <p>连接数据库后，用自然语言描述查询需求</p>
+      <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+        <el-tag
+          v-for="q in quickQuestions" :key="q"
+          type="info"
+          style="cursor:pointer;"
+          @click="sendMessage(q)"
+        >{{ q }}</el-tag>
+      </div>
+    </div>
+
+    <!-- 输入区 -->
+    <div class="chat-input-area">
+      <div class="input-row">
+        <el-input
+          v-model="inputText"
+          placeholder="输入查询需求，例如：查询所有用户数据"
+          @keyup.enter.exact="sendMessage(inputText)"
+          :disabled="!connected || loading"
+          size="large"
+        />
+        <el-button
+          type="primary"
+          size="large"
+          @click="sendMessage(inputText)"
+          :disabled="!connected || loading || !inputText.trim()"
+          :loading="loading"
+        >
+          发送
+        </el-button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Vue 3 + Element Plus + Highlight.js -->
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://unpkg.com/element-plus"></script>
+<script src="https://unpkg.com/@element-plus/icons-vue"></script>
+<script src="https://unpkg.com/highlight.js@11/lib/core.min.js"></script>
+<script src="https://unpkg.com/highlight.js@11/lib/languages/sql.min.js"></script>
+
+<script>
+const { createApp, ref, nextTick, onMounted } = Vue
+
+const app = createApp({
+  setup() {
+    // 状态
+    const sidebarOpen = ref(true)
+    const connected = ref(false)
+    const connecting = ref(false)
+    const loading = ref(false)
+    const inputText = ref('')
+    const messages = ref([])
+    const tables = ref([])
+    const msgContainer = ref(null)
+    const model = ref('')
+
+    const connForm = ref({
+      db_type: 'dameng',
+      host: 'localhost',
+      port: 5236,
+      user: 'SYSDBA',
+      password: 'SYSDBA001',
+      database: '',
+      schema: 'RDYS_PUBLIC_TBS'
+    })
+
+    const quickQuestions = [
+      '查询数据库中有哪些表',
+      '查看所有表的数据概况',
+      '查询数据量最多的那张表'
+    ]
+
+    // 方法
+    const scrollToBottom = () => {
+      nextTick(() => {
+        if (msgContainer.value) {
+          msgContainer.value.scrollTop = msgContainer.value.scrollHeight
+        }
+      })
+    }
+
+    const doConnect = async () => {
+      connecting.value = true
+      try {
+        const body = {
+          db_type: connForm.value.db_type,
+          host: connForm.value.host,
+          port: connForm.value.port,
+          user: connForm.value.user,
+          password: connForm.value.password,
+          database: connForm.value.database || undefined,
+          db_schema: connForm.value.schema || undefined
+        }
+        const res = await fetch('/api/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        })
+        const data = await res.json()
+        if (res.ok) {
+          connected.value = true
+          ElementPlus.ElMessage.success(data.message || '连接成功')
+          // 加载表列表
+          loadTables()
+        } else {
+          ElementPlus.ElMessage.error(data.detail || '连接失败')
+        }
+      } catch (e) {
+        ElementPlus.ElMessage.error('连接失败: ' + e.message)
+      } finally {
+        connecting.value = false
+      }
+    }
+
+    const loadTables = async () => {
+      try {
+        const res = await fetch('/api/tables')
+        const data = await res.json()
+        if (res.ok && data.tables) {
+          tables.value = data.tables
+        }
+      } catch (e) {
+        console.error('加载表列表失败', e)
+      }
+    }
+
+    const quickQuery = (tableName) => {
+      inputText.value = '查询 ' + tableName + ' 表的数据'
+      sendMessage(inputText.value)
+    }
+
+    const sendMessage = async (text) => {
+      if (!text || !text.trim() || loading.value) return
+      const question = text.trim()
+      inputText.value = ''
+
+      // 添加用户消息
+      messages.value.push({ role: 'user', content: question })
+
+      // 添加 AI 占位消息
+      const aiMsg = { role: 'assistant', answer_text: '', sql: '', columns: [], rows: [], row_count: 0, loading: true }
+      messages.value.push(aiMsg)
+      scrollToBottom()
+      loading.value = true
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question })
+        })
+        const data = await res.json()
+
+        // 更新 AI 消息
+        aiMsg.loading = false
+        aiMsg.answer_text = data.answer || ''
+        aiMsg.sql = data.sql || ''
+        aiMsg.columns = data.columns || []
+        aiMsg.rows = data.rows || []
+        aiMsg.row_count = data.rows ? data.rows.length : 0
+
+        scrollToBottom()
+      } catch (e) {
+        aiMsg.loading = false
+        aiMsg.answer_text = '请求失败: ' + e.message
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const highlightSQL = (sql) => {
+      if (typeof hljs !== 'undefined') {
+        return hljs.highlight(sql, { language: 'sql' }).value
+      }
+      return sql.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }
+
+    const copySQL = (sql) => {
+      navigator.clipboard.writeText(sql).then(() => {
+        ElementPlus.ElMessage.success('已复制 SQL')
+      })
+    }
+
+    const renderMarkdown = (text) => {
+      if (!text) return ''
+      return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>')
+        .replace(/`([^`]+)`/g, '<code style="background:#f0f2f5;padding:2px 6px;border-radius:3px;font-size:13px;">$1</code>')
+    }
+
+    // 检查健康状态
+    onMounted(async () => {
+      try {
+        const res = await fetch('/api/health')
+        const data = await res.json()
+        if (data.connected) {
+          connected.value = true
+          loadTables()
+        }
+      } catch (e) {
+        console.log('后端未启动')
+      }
+    })
+
+    return {
+      sidebarOpen, connected, connecting, loading,
+      inputText, messages, tables, msgContainer, model,
+      connForm, quickQuestions,
+      doConnect, loadTables, sendMessage, quickQuery,
+      highlightSQL, copySQL, renderMarkdown
+    }
+  }
+})
+
+// 注册 Element Plus 图标
+for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+  app.component(key, component)
+}
+app.use(ElementPlus)
+app.mount('#app')
+</script>
+</body>
+</html>

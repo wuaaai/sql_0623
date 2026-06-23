@@ -1,10 +1,18 @@
 [project]
 name = "sql-0623"
 version = "0.1.0"
-description = "Add your description here"
+description = "Text-to-SQL Agent - 自然语言查询数据库"
 requires-python = ">=3.11"
 dependencies = [
     "dmpython>=2.5.32",
+    "fastapi>=0.138.0",
     "openai>=2.43.0",
     "pymysql>=1.2.0",
+    "uvicorn>=0.49.0",
 ]
+
+[project.scripts]
+sql-agent = "server:main"
+
+[dependency-groups]
+dev = []

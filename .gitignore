@@ -1,4 +1,5 @@
 GenericAgent/
+SQLBot/
 __pycache__/
 *.pyc
 .venv/
