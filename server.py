@@ -138,7 +138,7 @@ def chat(req: ChatRequest):
     client = _build_client()
     system_prompt = _load_system_prompt()
 
-    # 注入连接上下文，避免 LLM 重复尝试连接
+    # 注入连接上下文
     conn = db_connection._conn_info or {}
     system_prompt += (
         f"\n\n[当前数据库连接状态]\n"
@@ -147,6 +147,12 @@ def chat(req: ChatRequest):
         f"数据库已连接，请直接使用 list_tables 和 run_sql 响应用户需求。"
         f"不要再调用 connect_db。"
     )
+
+    # 注入全局记忆
+    mem_path = os.path.join(os.path.dirname(__file__), "memory", "global_mem.txt")
+    if os.path.exists(mem_path):
+        with open(mem_path, "r", encoding="utf-8") as f:
+            system_prompt += f"\n\n[全局记忆]\n{f.read()}"
 
     handler = ServerHandler()
 
@@ -176,6 +182,9 @@ def chat(req: ChatRequest):
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 os.makedirs(static_dir, exist_ok=True)
+
+# 挂载静态文件目录
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 
 @app.get("/")
