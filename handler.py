@@ -57,10 +57,17 @@ class TextToSQLHandler(BaseHandler):
         result = db_connection.list_tables()
 
         if result["status"] == "success":
-            tables_str = ", ".join(result["tables"]) if result["tables"] else "（无表）"
+            tables = result["tables"]
+            total = result["table_count"]
+            # 只给LLM看前20个表名，避免它自作主张"整理分类"
+            preview = tables[:20]
+            tables_str = ", ".join(preview)
+            if total > 20:
+                tables_str += f" ... 共{total}张"
             return StepOutcome(
                 data=result,
-                next_prompt=f"数据库中共有 {result['table_count']} 张表: {tables_str}\n"
+                next_prompt=f"数据库中共有 {total} 张表。前20张: {tables_str}\n"
+                            f"请直接列出这些表名，不要添加未经证实的说明。"
                             f"用户可能会问某张表的数据，请用 run_sql 查询。"
             )
         else:
