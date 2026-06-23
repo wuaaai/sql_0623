@@ -1,0 +1,6 @@
+GenericAgent/
+__pycache__/
+*.pyc
+.venv/
+venv/
+temp/
