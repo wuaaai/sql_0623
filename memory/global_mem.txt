@@ -1,12 +1,12 @@
 # 全局记忆 (L2)
 
-## 数据库
-- 类型: 达梦 (Dameng)
-- Schema: RDYS_PUBLIC_TBS
-- 共47张表，前缀分 RDYS_BAS_ (基础), RDYS_LD_GZJD_ (工资), RDYS_LD_JJJD_ (经济), RDYS_LD_YSSC_ (预算生成), RDYS_LD_YSZX_ (预算执行)
-
 ## 达梦语法要点
 - 限制行数: WHERE ROWNUM <= N (不是 LIMIT)
 - 字符串拼接: 使用 || (不是 CONCAT)
 - 查询当前日期: SYSDATE
 - 分页: 使用 ROWNUM 子查询
+- 表名/列名在SQL中默认大写
+
+## 统计信息 (运行时动态更新)
+- Schema: RDYS_PUBLIC_TBS
+- 表数量: 执行 list_tables 获取

@@ -5,7 +5,15 @@ Agent 执行循环 (核心，参考 GenericAgent agent_loop.py)
 """
 
 import json
+from decimal import Decimal
 from handler import TextToSQLHandler, StepOutcome
+
+
+def _json_serial(obj):
+    """JSON序列化，处理Decimal等特殊类型"""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 
 def agent_runner_loop(client, system_prompt: str, user_input: str,
@@ -77,7 +85,7 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
                 return
 
             if outcome.data is not None:
-                result_str = json.dumps(outcome.data, ensure_ascii=False) \
+                result_str = json.dumps(outcome.data, ensure_ascii=False, default=_json_serial) \
                     if isinstance(outcome.data, (dict, list)) else str(outcome.data)
                 tool_results.append({
                     "tool_call_id": tc["id"],
