@@ -39,12 +39,13 @@ class TextToSQLHandler(BaseHandler):
 
     def do_connect_db(self, args: dict) -> StepOutcome:
         result = db_connection.connect_db(
-            db_type=args.get("db_type", "mysql"),
+            db_type=args.get("db_type", "dameng"),
             host=args.get("host"),
-            port=args.get("port", 3306),
+            port=args.get("port"),
             user=args.get("user"),
             password=args.get("password"),
-            database=args["database"]
+            database=args.get("database"),
+            schema=args.get("schema")
         )
         return StepOutcome(
             data=result,

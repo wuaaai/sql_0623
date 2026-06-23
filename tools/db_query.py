@@ -2,6 +2,7 @@
 SQL 查询执行工具
 
 阶段1: run_sql (仅SELECT)
+支持: 达梦(Dameng), MySQL, SQLite
 """
 
 from tools import db_connection as _db
@@ -30,11 +31,19 @@ def run_sql(sql: str):
             }
 
     try:
-        if _db._conn_info["db_type"] == "sqlite":
+        db_type = _db._conn_info["db_type"]
+
+        if db_type == "sqlite":
             cursor = _db._connection.execute(sql)
             rows = [dict(row) for row in cursor.fetchall()]
 
-        elif _db._conn_info["db_type"] == "mysql":
+        elif db_type == "dameng":
+            cursor = _db._connection.cursor()
+            cursor.execute(sql)
+            col_names = [d[0] for d in cursor.description] if cursor.description else []
+            rows = [dict(zip(col_names, row)) for row in cursor.fetchall()]
+
+        elif db_type == "mysql":
             cursor = _db._connection.cursor()
             cursor.execute(sql)
             rows = cursor.fetchall()
@@ -50,7 +59,6 @@ def run_sql(sql: str):
             }
 
         columns = list(rows[0].keys())
-        # 只返回前50行，避免数据过多
         result_rows = rows[:50]
         truncated = len(rows) > 50
 

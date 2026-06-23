@@ -2,18 +2,21 @@
 数据库连接管理工具
 
 阶段1: connect_db, list_tables
+支持: 达梦(Dameng), MySQL, SQLite
 """
 
 import sqlite3
 import pymysql
+import dmPython
 
 _connection = None
 _conn_info = None
 
 
-def connect_db(db_type: str, database: str,
-               host: str = None, port: int = 3306,
-               user: str = None, password: str = None):
+def connect_db(db_type: str, database: str = None,
+               host: str = None, port: int = None,
+               user: str = None, password: str = None,
+               schema: str = None):
     """建立数据库连接，保存为全局活跃连接"""
     global _connection, _conn_info
 
@@ -36,7 +39,33 @@ def connect_db(db_type: str, database: str,
                 "message": f"已连接到 SQLite: {database}"
             }
 
+        elif db_type == "dameng":
+            port = port or 5236
+            kwargs = {
+                "user": user,
+                "password": password,
+                "server": host,
+                "port": port
+            }
+            if database:
+                kwargs["database"] = database
+            if schema:
+                kwargs["schema"] = schema
+            _connection = dmPython.connect(**kwargs)
+            _conn_info = {
+                "db_type": "dameng",
+                "host": host,
+                "port": port,
+                "database": database,
+                "schema": schema
+            }
+            return {
+                "status": "success",
+                "message": f"已连接到达梦: {host}:{port}/{database or '默认库'} (schema={schema})"
+            }
+
         elif db_type == "mysql":
+            port = port or 3306
             _connection = pymysql.connect(
                 host=host, port=port, user=user,
                 password=password, database=database,
@@ -45,7 +74,7 @@ def connect_db(db_type: str, database: str,
             )
             _conn_info = {
                 "db_type": "mysql", "host": host,
-                "port": port, "database": database
+                "port": port, "database": database, "schema": schema
             }
             return {
                 "status": "success",
@@ -69,13 +98,26 @@ def list_tables():
         return {"status": "error", "message": "未连接数据库，请先使用 connect_db"}
 
     try:
-        if _conn_info["db_type"] == "sqlite":
+        db_type = _conn_info["db_type"]
+
+        if db_type == "sqlite":
             cursor = _connection.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
             )
             tables = [row[0] for row in cursor.fetchall()]
 
-        elif _conn_info["db_type"] == "mysql":
+        elif db_type == "dameng":
+            cursor = _connection.cursor()
+            schema = _conn_info.get("schema")
+            if schema:
+                cursor.execute(
+                    f"SELECT table_name FROM all_tables WHERE owner = '{schema.upper()}' ORDER BY table_name"
+                )
+            else:
+                cursor.execute("SELECT table_name FROM user_tables ORDER BY table_name")
+            tables = [row[0] for row in cursor.fetchall()]
+
+        elif db_type == "mysql":
             cursor = _connection.cursor()
             cursor.execute("SHOW TABLES")
             tables = [list(row.values())[0] for row in cursor.fetchall()]
