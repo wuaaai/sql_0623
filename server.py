@@ -137,6 +137,17 @@ def chat(req: ChatRequest):
 
     client = _build_client()
     system_prompt = _load_system_prompt()
+
+    # 注入连接上下文，避免 LLM 重复尝试连接
+    conn = db_connection._conn_info or {}
+    system_prompt += (
+        f"\n\n[当前数据库连接状态]\n"
+        f"数据库类型: {conn.get('db_type', '')}\n"
+        f"模式: {conn.get('schema', '')}\n"
+        f"数据库已连接，请直接使用 list_tables 和 run_sql 响应用户需求。"
+        f"不要再调用 connect_db。"
+    )
+
     handler = ServerHandler()
 
     # 收集 agent 输出
