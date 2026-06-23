@@ -1,66 +1,64 @@
 # SQL 生成技能
 
-## 规则
+## 核心规则
 
-1. **只能 SELECT**，禁止 INSERT/UPDATE/DELETE/DROP/CREATE/ALTER/TRUNCATE
-2. 达梦数据库使用 `ROWNUM` 限制行数（不是 LIMIT）
-3. 达梦数据库使用 `||` 连接字符串（不是 CONCAT）
-4. 关键字大写: SELECT, FROM, WHERE, JOIN, AND, OR, LIKE, BETWEEN, IN, ORDER BY, GROUP BY
+1. **只能 SELECT**，禁止写操作
+2. 达梦: `ROWNUM` (非 LIMIT), `||` (非 CONCAT)
+3. 关键字大写: SELECT, FROM, WHERE, AND, OR, LIKE, BETWEEN, IN, ORDER BY
+4. 字符串单引号，数字不加引号
+5. **写 WHERE 前必须 describe_table 确认列名**
 
-## 写法规范
+## 预算业务查询模式
 
+### 模式A: 按预算类型找表
+用户说"一般公共预算" → search_schema("一般公共预算") 或 search_schema("YBGGYS")
+找到表后 describe_table 确认结构，再根据用户具体需求写 SQL。
+
+### 模式B: 按地区筛选
+"河北省" → `WHERE RG_NAME = '河北省'`
+"石家庄" → `WHERE RG_NAME LIKE '%石家庄%'`
+"省本级" → `WHERE RG_NAME LIKE '%本级%'`
+"各地市" → `WHERE RG_NAME NOT LIKE '%本级%'`
+
+### 模式C: 按时间筛选
+"2025年1月" → `WHERE YEAR_MONTH = '202501'`
+"2025年" → `WHERE YEAR_MONTH LIKE '2025%'` 或 `WHERE DATE_YEAR = '2025'`
+"今年" → 推断当前年份
+
+### 模式D: 按项目筛选
+"合计" → `WHERE XM_NAME LIKE '%合计%'`
+"税收" → `WHERE XM_NAME LIKE '%税收%'`
+
+### 模式E: 同比对比（核心场景）
+用户问"增长/下降/比去年" → 选择同比列 BYS_TBE(增减额) 和 BYS_TBB(增减率)
+"同比下降" → `WHERE BYS_TBE < 0`
+"同比增长超过10%" → `WHERE BYS_TBB > 10`
+
+### 模式F: 条件组合
+"河北省2025年1月一般公共预算收入合计" →
 ```sql
-SELECT column1, column2
+SELECT RG_NAME, YEAR_MONTH, XM_NAME, YSS, BYS_JE, BYS_SNTYS, BYS_TBE, BYS_TBB
 FROM table_name
-WHERE condition1
-  AND condition2
-ORDER BY column1
+WHERE RG_NAME = '河北省'
+  AND YEAR_MONTH = '202501'
+  AND XM_NAME LIKE '%合计%'
+  AND ROWNUM <= 20
 ```
 
-- 每个子句独占一行
-- AND/OR 条件对齐缩进
-- 达梦查询前 N 行: `WHERE ROWNUM <= N`
+### 模式G: 智能列选择
+不要 SELECT *，根据用户关注点选列:
+- 用户关注"完成情况" → 选 BYS_JE, BYLJS_JE, YSS
+- 用户关注"同比" → 选 BYS_JE, BYS_SNTYS, BYS_TBE, BYS_TBB
+- 用户关注"排名" → 选 RG_NAME, 指标列, 加 ORDER BY
+- 用户问"有哪些" → 选 RG_NAME, XM_NAME, YEAR_MONTH
 
-## WHERE 条件模式
+## 达梦 ORDER BY + ROWNUM
 
-### 等值匹配
-用户: "MOF_DIV_CODE 是 130000000" → `WHERE MOF_DIV_CODE = '130000000'`
-用户: "级别为3" → `WHERE LEVEL_NO = 3`
-
-### 比较运算
-用户: "级别大于2" → `WHERE LEVEL_NO > 2`
-用户: "金额大于等于1000" → `WHERE amount >= 1000`
-
-### 模糊匹配 LIKE
-用户: "名称包含教育" → `WHERE name LIKE '%教育%'`
-用户: "以海南省开头" → `WHERE name LIKE '海南省%'`
-
-### 多条件 AND/OR
-用户: "级别为3且已启用" → `WHERE LEVEL_NO = 3 AND IS_ENABLED = 1`
-用户: "级别为2或3" → `WHERE LEVEL_NO = 2 OR LEVEL_NO = 3`
-也支持: `WHERE LEVEL_NO IN (2, 3)`
-
-### BETWEEN 范围
-用户: "FISCAL_YEAR 在 2020 到 2022 之间" → `WHERE FISCAL_YEAR BETWEEN 2020 AND 2022`
-
-### NULL 判断
-用户: "备注为空的" → `WHERE memo IS NULL`
-用户: "有备注的" → `WHERE memo IS NOT NULL`
-
-### ORDER BY 排序
-用户: "按级别从低到高" → `ORDER BY LEVEL_NO ASC`
-用户: "按时间倒序" → `ORDER BY UPDATE_TIME DESC`
-
-## 安全
-
-- 必须加 ROWNUM 限制（默认 <= 20，用户指定时用指定值）
-- 不带 ROWNUM 的大表全量查询必须拒绝
-- 遇到写操作自动拦截
-
-## 达梦语法要点
-
-- ROWNUM <= N (不是 LIMIT N)
-- 字符串拼接: ||
-- 当前日期: SYSDATE
-- 字符串必须用单引号
-- 数字不加引号: WHERE LEVEL_NO = 3 (不是 '3')
+```sql
+-- 正确写法 (先排序再取前N)
+SELECT * FROM (
+  SELECT * FROM table_name
+  WHERE conditions
+  ORDER BY column_name DESC
+) WHERE ROWNUM <= 10
+```

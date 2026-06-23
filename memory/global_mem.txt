@@ -5,8 +5,50 @@
 - 字符串拼接: 使用 || (不是 CONCAT)
 - 查询当前日期: SYSDATE
 - 分页: 使用 ROWNUM 子查询
-- 表名/列名在SQL中默认大写
+- ORDER BY + ROWNUM: 必须嵌套子查询 (ROWNUM先于ORDER BY执行)
 
-## 统计信息 (运行时动态更新)
-- Schema: RDYS_PUBLIC_TBS
-- 表数量: 执行 list_tables 获取
+## 数据库概况
+- Schema: RDYS_PUBLIC_TBS，共47张表
+
+## 四大预算类型 → 表名前缀映射
+
+| 用户口语 | 表名前缀 | 数量 |
+|----------|----------|------|
+| 一般公共预算 | YBGGYS | 7张 |
+| 社会保险/社保基金 | SHBXJJ | 7张 |
+| 国有资本/国资预算 | GYZBJY | 7张 |
+| 政府性基金 | ZFXJJ | 4张 |
+
+所有预算表均在 RDYS_LD_YSSC_* (预算生成) 或 RDYS_LD_YSZX_* (预算执行) 前缀下。
+
+## 预算表通用字段结构
+
+几乎所有的预算收支表都包含以下核心字段：
+
+| 字段 | 含义 | 用途 |
+|------|------|------|
+| RG_CODE / RG_NAME | 地区编码/名称 | WHERE 筛选地区 |
+| YEAR_MONTH | 年月 (格式: 202001) | WHERE 筛选时间 |
+| DATE_YEAR | 年度 | WHERE 筛选年份 |
+| XM_CODE / XM_NAME | 项目编码/名称 | WHERE 筛选项目(合计/税收等) |
+| DEPT_CODE / DEPT_NAME | 部门编码/名称 | WHERE 筛选部门 |
+| YSS | 预算数 | 全年预算安排金额 |
+| BYS_JE / BY_JE | 本月金额 | 当月收入/支出完成额 |
+| BYS_SNTYS / BY_SNTYS | 上年同期金额 | 去年同月数 |
+| BYS_TBE / BY_TBE | 同比增减额 | 比去年多了多少 |
+| BYS_TBB / BY_TBBFS | 同比增减率(%) | 增长百分比 |
+| BYLJS_JE | 本月累计金额 | 年初到本月的累计 |
+
+**注意**: 不同表的列名可能有细微差异（如 BYS_JE vs BY_JE），查询前必须用 describe_table 确认。
+
+## 预算表常见项目名称 (XM_NAME 常见值)
+- "合    计" / "合计" / "一、收入合计"
+- "一、税收收入"
+- "二、非税收入"
+- 具体税种或费用名称
+
+## 地区编码体系
+- 130000000: 河北省本级
+- 以 130 开头的其他编码: 河北省下各地市
+- RG_NAME LIKE '%本级%': 省级本级数据
+- RG_NAME NOT LIKE '%本级%': 各地市数据（排除本级）
