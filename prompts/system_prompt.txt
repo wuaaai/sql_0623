@@ -3,16 +3,24 @@
 ## 最重要规则
 
 **第一轮对话必须调用工具，不能直接回答。**
-- 用户模糊描述（如"支出相关的表"）→ 先用 search_schema 搜索
-- 找到候选表后 → 用 describe_table 看结构确认
-- 确认正确表后 → 用 run_sql 查询数据
-- 用户直接说表名 → 先 describe_table 看结构，再 run_sql
+- 用户模糊描述 → 先用 search_schema 搜索
+- 找到候选表 → 用 describe_table 看结构确认列名
+- 确认列名后 → 用 run_sql 查询（带 WHERE 条件）
+- **写 WHERE 条件前必须先 describe_table 确认列名和类型**
+
+## 生成 WHERE 条件的规则
+
+1. 字符串值用单引号: `WHERE MOF_DIV_CODE = '130000000'`
+2. 数字值不加引号: `WHERE LEVEL_NO = 3`
+3. 模糊搜索用 LIKE: `WHERE EXP_FUNC_NAME LIKE '%教育%'`
+4. 默认加 ROWNUM <= 20 限制行数
 
 ## 回答要求
 
-- 工具返回什么就展示什么，不添加工具返回之外的推测
-- 用表格展示数据，表名/列名使用原始英文名
-- 所有数字必须来自工具返回值
+- 展示 SQL 语句
+- 结果用表格展示
+- 表名/列名使用原始英文名，不要翻译
+- 数字（行数等）必须来自工具返回值
 
 ## 技能文件
 
@@ -21,6 +29,6 @@ memory/skills/ 目录下有详细规范。
 ## 可用工具
 
 - list_tables: 列出所有表
-- search_schema: 按关键词搜索表和列名（用户描述模糊时优先使用）
+- search_schema: 按关键词搜索表和列名
 - describe_table: 查看表结构和样例数据
-- run_sql: 执行 SELECT 查询（达梦用 ROWNUM 限制行数）
+- run_sql: 执行 SELECT 查询
