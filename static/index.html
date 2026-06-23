@@ -258,7 +258,64 @@
 
     .copy-btn:hover { color: #fff; border-color: #fff; }
 
-    /* 结果表格 */
+    /* Markdown 渲染样式 */
+    .msg-bubble h1, .msg-bubble h2, .msg-bubble h3 {
+      margin: 12px 0 8px;
+      font-weight: 600;
+    }
+    .msg-bubble h2 { font-size: 15px; border-bottom: 1px solid #ebeef5; padding-bottom: 4px; }
+    .msg-bubble h3 { font-size: 14px; }
+    .msg-bubble p { margin: 6px 0; }
+    .msg-bubble ul, .msg-bubble ol { padding-left: 20px; margin: 6px 0; }
+    .msg-bubble li { margin: 2px 0; }
+    .msg-bubble table {
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 13px;
+      width: 100%;
+    }
+    .msg-bubble table th {
+      background: #f5f7fa;
+      padding: 8px 12px;
+      text-align: left;
+      font-weight: 600;
+      border: 1px solid #e4e7ed;
+    }
+    .msg-bubble table td {
+      padding: 6px 12px;
+      border: 1px solid #ebeef5;
+    }
+    .msg-bubble table tr:nth-child(even) td { background: #fafafa; }
+    .msg-bubble code {
+      background: #f0f2f5;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 13px;
+      font-family: "Fira Code", Consolas, monospace;
+    }
+    .msg-bubble pre {
+      background: #1e1e1e;
+      border-radius: 8px;
+      padding: 14px;
+      margin: 10px 0;
+      overflow-x: auto;
+    }
+    .msg-bubble pre code {
+      background: none;
+      padding: 0;
+      color: #abb2bf;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .msg-bubble strong { font-weight: 600; }
+    .msg-bubble blockquote {
+      border-left: 3px solid #409eff;
+      padding: 4px 12px;
+      margin: 8px 0;
+      color: #606266;
+      background: #f5f7fa;
+    }
+    .msg-bubble hr { border: none; border-top: 1px solid #ebeef5; margin: 12px 0; }
     .result-table-wrap {
       margin: 12px 0;
       border: 1px solid var(--border);
@@ -553,10 +610,11 @@
   </div>
 </div>
 
-<!-- Vue 3 + Element Plus + Highlight.js -->
+<!-- Vue 3 + Element Plus + Marked + Highlight.js -->
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://unpkg.com/element-plus"></script>
 <script src="https://unpkg.com/@element-plus/icons-vue"></script>
+<script src="https://unpkg.com/marked/marked.min.js"></script>
 <script src="https://unpkg.com/highlight.js@11/lib/core.min.js"></script>
 <script src="https://unpkg.com/highlight.js@11/lib/languages/sql.min.js"></script>
 
@@ -705,14 +763,32 @@ const app = createApp({
 
     const renderMarkdown = (text) => {
       if (!text) return ''
+      if (typeof marked !== 'undefined') {
+        // 配置 marked + highlight.js
+        if (!marked._configured) {
+          marked.setOptions({
+            breaks: true,
+            gfm: true
+          })
+          if (typeof hljs !== 'undefined') {
+            marked.setOptions({
+              highlight: (code, lang) => {
+                if (lang && hljs.getLanguage(lang)) {
+                  return hljs.highlight(code, { language: lang }).value
+                }
+                return hljs.highlightAuto(code).value
+              }
+            })
+          }
+          marked._configured = true
+        }
+        return marked.parse(text)
+      }
+      // fallback: 基础渲染
       return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/\n/g, '<br>')
-        .replace(/`([^`]+)`/g, '<code style="background:#f0f2f5;padding:2px 6px;border-radius:3px;font-size:13px;">$1</code>')
+        .replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')
     }
 
     // 检查健康状态
