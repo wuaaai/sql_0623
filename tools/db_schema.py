@@ -8,6 +8,9 @@ suggest_columns: 根据用户意图智能推荐列名
 
 from tools import db_connection as _db
 
+# 进程级缓存：同表不重复查结构
+_desc_cache: dict = {}
+
 # 预算类型→英文缩写映射，用于 search_schema 自动扩展
 BUDGET_TYPE_MAP = {
     "一般公共预算": "YBGGYS",
@@ -42,6 +45,10 @@ def _find_budget_abbr(keyword: str) -> str:
 
 def describe_table(table_name: str):
     """查看表结构：列名、类型、是否可空，并附带一行样例数据"""
+    cache_key = table_name.upper()
+    if cache_key in _desc_cache:
+        return _desc_cache[cache_key]
+
     if _db._connection is None:
         return {"status": "error", "message": "未连接数据库"}
 
@@ -118,13 +125,15 @@ def describe_table(table_name: str):
             except Exception:
                 sample_row = None
 
-        return {
+        result = {
             "status": "success",
             "table_name": table_name,
             "column_count": len(columns),
             "columns": columns,
             "sample_row": sample_row
         }
+        _desc_cache[cache_key] = result
+        return result
 
     except Exception as e:
         return {"status": "error", "message": f"获取表结构失败: {str(e)}"}
