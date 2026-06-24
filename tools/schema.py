@@ -291,5 +291,20 @@ TOOLS_SCHEMA = [
                 "required": ["keyword"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_memory",
+            "description": "跨层搜索记忆系统(L1索引/L3技能/L4模式)。用于查找之前学到的知识、相似查询模式或相关技能文件。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "keyword": {"type": "string", "description": "搜索关键词"},
+                    "layer": {"type": "string", "description": "搜索层级: all/L1/L3/L4，默认all"}
+                },
+                "required": ["keyword"]
+            }
+        }
     }
 ]
