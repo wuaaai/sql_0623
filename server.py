@@ -375,6 +375,19 @@ def index():
 
 def main():
     import uvicorn
+    # 启动时自动连接数据库
+    try:
+        db_connection.connect_db(
+            db_type=os.environ.get("DB_TYPE", "dameng"),
+            host=os.environ.get("DB_HOST", "localhost"),
+            port=int(os.environ.get("DB_PORT", "5236")),
+            user=os.environ.get("DB_USER", "SYSDBA"),
+            password=os.environ.get("DB_PASSWORD", "SYSDBA001"),
+            schema=os.environ.get("DB_SCHEMA", "RDYS_PUBLIC_TBS")
+        )
+        print(f"[启动] 已自动连接数据库 {os.environ.get('DB_SCHEMA', 'RDYS_PUBLIC_TBS')}")
+    except Exception as e:
+        print(f"[启动] 数据库自动连接失败: {e}")
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
 
