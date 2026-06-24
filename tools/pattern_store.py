@@ -140,6 +140,16 @@ def search_patterns(keyword: str, budget_type: str = "", limit: int = 3) -> dict
     scored = []
     kw_lower = keyword.lower()
 
+    # 提取关键词：中文按字符，英文按空格
+    import re as _re
+    kw_chars = set(kw_lower)
+    # 提取2-4字的中文词组
+    kw_bigrams = set()
+    for i in range(len(keyword)-1):
+        chunk = keyword[i:i+2]
+        if _re.search(r'[一-鿿]{2}', chunk):
+            kw_bigrams.add(chunk)
+
     for p_info in idx["patterns"]:
         pid = p_info["id"]
         pattern_file = os.path.join(PATTERNS_SUBDIR, f"{pid}.json")
@@ -151,28 +161,42 @@ def search_patterns(keyword: str, budget_type: str = "", limit: int = 3) -> dict
         except (json.JSONDecodeError, IOError):
             continue
 
-        # 计算相似度
         score = 0
         q = p.get("question", "")
-        # 关键词匹配
-        for kw in kw_lower.split():
-            if kw in q.lower():
-                score += 30
+
+        # 中文词组匹配（权重最高）
+        q_bigrams = set()
+        for i in range(len(q)-1):
+            chunk = q[i:i+2]
+            if _re.search(r'[一-鿿]{2}', chunk):
+                q_bigrams.add(chunk)
+        common_bigrams = kw_bigrams & q_bigrams
+        if kw_bigrams:
+            score += len(common_bigrams) / len(kw_bigrams) * 50
+
+        # 子串匹配
+        if len(kw_lower) > 3:
+            for chunk_len in [4, 6, 8]:
+                for i in range(0, len(keyword) - chunk_len + 1, chunk_len // 2):
+                    sub = keyword[i:i+chunk_len]
+                    if len(sub) >= 3 and sub in q:
+                        score += 10
+                        break
+
+        # 表名匹配（同一张表+20分）
+        if p.get("table") == p_info.get("table"):
+            score += 20
+
         # 预算类型匹配
         if budget_type and p.get("budget_type") == budget_type:
-            score += 40
-        # 查询类型加分
-        if _extract_query_type(keyword, "") == p.get("query_type"):
-            score += 20
-        # 使用次数加分
-        score += min(p.get("use_count", 1) * 5, 25)
-        # 时间衰减（最近使用加分）
-        last = p.get("last_used", "")
-        if last and last[:7] == datetime.now().strftime("%Y-%m"):
-            score += 10
+            score += 25
+
+        # 使用次数加成
+        score += min(p.get("use_count", 1) * 3, 15)
 
         if score > 0:
-            scored.append({"pattern": p, "score": score, "similarity": min(score, 95)})
+            similarity = min(round(score), 95)
+            scored.append({"pattern": p, "score": score, "similarity": similarity})
 
     # 排序取Top N
     scored.sort(key=lambda x: x["similarity"], reverse=True)
