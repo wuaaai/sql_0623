@@ -727,8 +727,14 @@ const app = createApp({
           scrollToBottom()
         }
 
-        // 流结束，延迟一下确保所有文本处理完毕再渲染markdown
-        await new Promise(r => setTimeout(r, 100))
+        // 流结束，处理缓冲区剩余数据，延迟确保文本完整再渲染markdown
+        if (buffer.trim() && buffer.trim().startsWith('data: ')) {
+          try {
+            const event = JSON.parse(buffer.trim().slice(6))
+            if (event.type === 'text') aiMsg.answer_text += event.text
+          } catch (e) {}
+        }
+        await new Promise(r => setTimeout(r, 200))
         aiMsg.loading = false
         await nextTick()
 
