@@ -83,71 +83,7 @@
 
 # 阶段2 测试问题集 — 条件筛选
 
-## 等值匹配
-
-| # | 问题 | 预期目标 |
-|---|------|----------|
-| 40 | 查询 RDYS_BAS_EXPFUNC 中 MOF_DIV_CODE 为 '130000000' 的数据 | 调用 describe_table → run_sql，WHERE MOF_DIV_CODE = '130000000' |
-| 41 | RDYS_BAS_MOFDIV 中 LEVEL_NO 等于 3 的记录有哪些 | WHERE LEVEL_NO = 3（数字不加引号） |
-| 42 | 查询 RDYS_BAS_EXPFUNC 中 IS_ENABLED 为 1 的记录 | WHERE IS_ENABLED = 1 |
-| 43 | RDYS_BAS_INCOMESORT 中 FISCAL_YEAR 为 2021 的数据 | WHERE FISCAL_YEAR = 2021 |
-
-## 比较运算
-
-| # | 问题 | 预期目标 |
-|---|------|----------|
-| 44 | RDYS_BAS_EXPFUNC 中 LEVEL_NO 大于 2 的记录 | WHERE LEVEL_NO > 2 |
-| 45 | RDYS_BAS_MOFDIV 中 LEVEL_NO 小于等于 2 的 | WHERE LEVEL_NO <= 2 |
-| 46 | 查询 IS_LEAF 不等于 1 的记录 | WHERE IS_LEAF <> 1 或 != 1 |
-
-## 模糊匹配 LIKE
-
-| # | 问题 | 预期目标 |
-|---|------|----------|
-| 47 | 查询 RDYS_BAS_EXPFUNC 中 EXP_FUNC_NAME 包含"教育"的记录 | WHERE EXP_FUNC_NAME LIKE '%教育%' |
-| 48 | 查询支出功能分类中名称包含"交通"的数据 | search_schema → describe → WHERE EXP_FUNC_NAME LIKE '%交通%' |
-| 49 | RDYS_BAS_MOFDIV 中 MOF_DIV_NAME 以"综合"开头的 | WHERE MOF_DIV_NAME LIKE '综合%' |
-| 50 | 收入分类表中名称包含"税"的有哪些 | search_schema("收入") → describe → WHERE INCOME_SORT_NAME LIKE '%税%' |
-| 51 | 查找支出名称中包含"公路"的记录 | WHERE EXP_FUNC_NAME LIKE '%公路%' |
-
-## 多条件 AND/OR
-
-| # | 问题 | 预期目标 |
-|---|------|----------|
-| 52 | 查询 LEVEL_NO 为 3 且 IS_ENABLED 为 1 的支出分类 | WHERE LEVEL_NO = 3 AND IS_ENABLED = 1 |
-| 53 | RDYS_BAS_EXPFUNC 中 FISCAL_YEAR 为 2021 且 LEVEL_NO 大于 1 的 | WHERE FISCAL_YEAR = 2021 AND LEVEL_NO > 1 |
-| 54 | 查询 MOF_DIV_CODE 为 '130000000' 且 IS_LEAF 为 1 且已启用的 | WHERE MOF_DIV_CODE = '130000000' AND IS_LEAF = 1 AND IS_ENABLED = 1 |
-| 55 | LEVEL_NO 为 2 或 3 的记录 | WHERE LEVEL_NO IN (2, 3) 或 LEVEL_NO = 2 OR LEVEL_NO = 3 |
-
-## 排序 ORDER BY
-
-| # | 问题 | 预期目标 |
-|---|------|----------|
-| 56 | 查询支出分类，按 LEVEL_NO 从小到大排列 | ORDER BY LEVEL_NO ASC |
-| 57 | 查询 RDYS_BAS_MOFDIV，按 UPDATE_TIME 倒序显示前10条 | ORDER BY UPDATE_TIME DESC，ROWNUM <= 10 |
-| 58 | 按 FISCAL_YEAR 降序，显示前5条 | ORDER BY FISCAL_YEAR DESC，ROWNUM <= 5 |
-
-## 组合查询（筛选 + 排序 + 限制）
-
-| # | 问题 | 预期目标 |
-|---|------|----------|
-| 59 | 查询已启用的支出分类，按级别排序，只要前10条 | WHERE IS_ENABLED = 1 ORDER BY LEVEL_NO ASC + ROWNUM <= 10 |
-| 60 | 2021年的收入分类中包含"企业"的，按名称排序前5条 | search_schema → describe → WHERE FISCAL_YEAR = 2021 AND INCOME_SORT_NAME LIKE '%企业%' ORDER BY INCOME_SORT_NAME，ROWNUM <= 5 |
-| 61 | 财政部门划分表中 LEVEL_NO=3 且包含"区"的记录 | describe → WHERE LEVEL_NO = 3 AND MOF_DIV_NAME LIKE '%区%' |
-
-## 模糊场景——从描述到条件查询
-
-| # | 问题 | 预期目标 |
-|---|------|----------|
-| 62 | 查询支出分类表中所有和"教育"相关的已启用记录 | search_schema("支出") → describe RDYS_BAS_EXPFUNC → WHERE EXP_FUNC_NAME LIKE '%教育%' AND IS_ENABLED = 1 |
-| 63 | 财政部门划分表中，看看有哪些"开发区" | search_schema → describe RDYS_BAS_MOFDIV → WHERE MOF_DIV_NAME LIKE '%开发区%' |
-| 64 | 收入分类中，2021年有哪些税种的收入 | search_schema("收入") → describe → WHERE FISCAL_YEAR = 2021 AND INCOME_SORT_NAME LIKE '%税%' |
-
-## 边界测试
-
-| # | 问题 | 预期目标 |
-|---|------|----------|
-| 65 | 查询 EXP_FUNC_NAME 包含"火星"的记录 | 执行查询，返回0行，告知用户无匹配 |
-| 66 | 查询 LEVEL_NO 等于 99 的记录 | 返回0行或极少数 |
-| 67 | 按不存在的列筛选 | Agent 应先 describe_table 确认列名，避免盲目查询 |
+> 阶段2完整测试问题已移至 [STAGE2_TESTS.md](STAGE2_TESTS.md)，共56题覆盖8个子场景。
+> 所有问题均为预算分析人员真实口语，不含英文表名/列名/编码。
+> Agent 必须自动完成口语→表/列/值的映射。
 
