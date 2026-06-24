@@ -8,7 +8,7 @@ dispatch(tool_name, args) → do_<tool_name>(args) → StepOutcome
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from tools import db_connection, db_query, db_schema, time_resolver, db_aggregation, db_cross_table, db_advanced, error_handler
+from tools import db_connection, db_query, db_schema, time_resolver, db_aggregation, db_cross_table, db_advanced, error_handler, pattern_store
 
 
 @dataclass
