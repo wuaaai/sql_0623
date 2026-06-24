@@ -751,11 +751,7 @@ const app = createApp({
                 const event = JSON.parse(line.slice(6))
                 if (event.type === 'text') {
                   aiMsg.answer_text += event.text
-                } else if (event.type === 'tool') {
-                  // 工具调用提示（可选展示）
                 } else if (event.type === 'done') {
-                  aiMsg.streaming = false
-                  aiMsg.loading = false
                   aiMsg.sql = event.sql || ''
                   aiMsg.columns = event.columns || []
                   aiMsg.rows = event.rows || []
@@ -768,6 +764,11 @@ const app = createApp({
           }
           scrollToBottom()
         }
+
+        // 流结束，延迟一下确保所有文本处理完毕再渲染markdown
+        await new Promise(r => setTimeout(r, 100))
+        aiMsg.loading = false
+        await nextTick()
 
         // 检测追问
         const answer = aiMsg.answer_text || ''
