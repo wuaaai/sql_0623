@@ -109,5 +109,25 @@ TOOLS_SCHEMA = [
                 "required": ["keyword"]
             }
         }
+    {
+        "type": "function",
+        "function": {
+            "name": "suggest_columns",
+            "description": "根据表名和用户意图，智能推荐应查询的列名。用于避免 SELECT * 查询，按用户关注点（完成情况/同比/排名/预算执行）选择相关列。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table_name": {
+                        "type": "string",
+                        "description": "表名"
+                    },
+                    "intent": {
+                        "type": "string",
+                        "description": "用户意图描述，如：完成情况、同比、排名、预算执行"
+                    }
+                },
+                "required": ["table_name", "intent"]
+            }
+        }
     }
 ]

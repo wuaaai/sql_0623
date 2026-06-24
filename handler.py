@@ -90,7 +90,6 @@ class TextToSQLHandler(BaseHandler):
                                 f"请告知用户没有匹配的数据。"
                 )
             else:
-                # 将结果格式化为可读文本
                 rows_display = _format_rows(result["columns"], result["rows"])
                 warning = result.get("warning", "")
                 return StepOutcome(
@@ -99,6 +98,7 @@ class TextToSQLHandler(BaseHandler):
                                 f"列: {result['columns']}\n"
                                 f"数据:\n{rows_display}\n"
                                 f"请用自然语言向用户展示和解释这些结果。"
+                                f"\n[提示] 下次查询前可用 suggest_columns(表名, 意图) 智能选列，避免 SELECT *。"
                 )
         else:
             return StepOutcome(
@@ -139,11 +139,27 @@ class TextToSQLHandler(BaseHandler):
             tables = result.get("matched_tables", [])
             columns = result.get("matched_columns", [])
 
-            msg = f"搜索 '{keyword}' 的结果:\n"
+            # 检测预算类型，提示下一步
+            budget_hint = ""
+            from tools.db_schema import BUDGET_TYPE_MAP
+            for term, abbr in BUDGET_TYPE_MAP.items():
+                if term in keyword:
+                    budget_hint = f"\n[预算类型] 检测到「{term}」，对应表名前缀={abbr}"
+                    break
+
+            msg = f"搜索 '{keyword}' 的结果:{budget_hint}\n"
             if tables:
-                msg += f"\n匹配的表 ({len(tables)}): {', '.join(tables[:15])}"
+                # 兼容新旧格式: str 或 dict
+                table_names = [t["name"] if isinstance(t, dict) else t for t in tables]
+                msg += f"\n匹配的表 ({len(tables)}): {', '.join(table_names[:15])}"
                 if len(tables) > 15:
                     msg += f" ... 还有{len(tables)-15}张"
+                # 显示注释
+                comments = [t for t in tables if isinstance(t, dict) and t.get("comment")]
+                if comments:
+                    msg += "\n表注释: " + "; ".join(
+                        f"{c['name']}={c['comment']}" for c in comments[:5]
+                    )
             if columns:
                 msg += f"\n匹配的列 ({len(columns)}): "
                 col_strs = [f"{c['table']}.{c['column']}({c['type']})" for c in columns[:10]]
@@ -151,16 +167,48 @@ class TextToSQLHandler(BaseHandler):
                 if len(columns) > 10:
                     msg += f" ... 还有{len(columns)-10}列"
             if not tables and not columns:
-                msg += "\n未找到匹配的表或列，建议尝试其他关键词。"
+                msg += "\n未找到匹配，建议尝试: 一般公共预算/社保/国资/政府性基金"
+
+            guidance = ""
+            if tables:
+                first_table = table_names[0] if table_names else ""
+                if first_table:
+                    guidance = (
+                        f"\n[下一步] describe_table({first_table}) 查看结构 → "
+                        f"suggest_columns({first_table}, '完成情况/同比/排名') 选列 → run_sql 查询"
+                    )
 
             return StepOutcome(
                 data=result,
-                next_prompt=msg + "\n请根据搜索结果帮助用户找到正确的表。"
+                next_prompt=msg + guidance
             )
         else:
             return StepOutcome(
                 data=result,
                 next_prompt=f"搜索失败: {result['message']}"
+            )
+
+    def do_suggest_columns(self, args: dict) -> StepOutcome:
+        result = db_schema.suggest_columns(args["table_name"], args["intent"])
+
+        if result["status"] == "success":
+            suggested = result["suggested_columns"]
+            variants = result.get("column_variants", {})
+
+            msg = f"表 {result['table_name']} 针对「{result['intent']}」的推荐列:\n"
+            msg += f"推荐列: {', '.join(suggested)}\n"
+            if variants:
+                msg += "列名变体: " + "; ".join(
+                    f"{k}→{' 或 '.join(v)}" for k, v in variants.items()
+                )
+            return StepOutcome(
+                data=result,
+                next_prompt=msg + "\n请用这些列名写 SELECT 查询，不要写 SELECT *。"
+            )
+        else:
+            return StepOutcome(
+                data=result,
+                next_prompt=f"获取推荐列失败: {result['message']}"
             )
 
 
