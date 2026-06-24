@@ -123,10 +123,17 @@ class TextToSQLHandler(BaseHandler):
             if result.get("sample_row"):
                 sample = f"\n样例: {result['sample_row']}"
 
+            # 高亮金额列
+            amount_keywords = ["JE", "YS", "TBE", "TBB", "TBP", "LJS", "SR", "ZC", "LJ_"]
+            amount_cols = [c["name"] for c in result["columns"] if any(kw in c["name"].upper() for kw in amount_keywords)]
+            amount_hint = ""
+            if amount_cols:
+                amount_hint = f"\n金额列: {', '.join(amount_cols[:8])}"
+
             return StepOutcome(
                 data=result,
-                next_prompt=f"表 {result['table_name']}（{result['column_count']}列，展示前15列）:\n{cols_desc}{sample}\n"
-                            f"列结构已确认，直接 run_sql 查询。"
+                next_prompt=f"表 {result['table_name']}（{result['column_count']}列）:\n{cols_desc}{amount_hint}{sample}\n"
+                            f"直接 run_sql 查询。排名用 ORDER BY 金额列 DESC。"
             )
         else:
             return StepOutcome(

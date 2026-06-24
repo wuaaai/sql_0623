@@ -39,6 +39,12 @@
 - 不要在 describe 和 run_sql 之间插入 suggest_columns（除非列名完全不明确）
 - 能合并的工具调用放在同一轮
 
+**排名查询模板**（直接抄）:
+- 收入排名: `SELECT RG_NAME, BYS_JE FROM table WHERE XM_NAME LIKE '%合%计%' AND RG_NAME NOT LIKE '%本级%' ORDER BY BYS_JE DESC`
+- 同比排名: `SELECT RG_NAME, BYS_TBB FROM table WHERE XM_NAME LIKE '%合%计%' AND RG_NAME NOT LIKE '%本级%' ORDER BY BYS_TBB DESC`
+- 取TOP N: 外层 `WHERE ROWNUM <= N`（达梦嵌套子查询）
+- **严禁** `SELECT DISTINCT RG_NAME` 代替排名查询
+
 ## 时间处理规则
 
 1. **用户没提时间** → 调用 resolve_time("") → 自动返回数据库最新年月
