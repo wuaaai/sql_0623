@@ -42,9 +42,7 @@
 - "合    计" / "合计" / "一、收入合计"
 - "一、税收收入" / "二、非税收入"
 
-## 排名查询（重要）
-- 一般公共预算有专门排名表: RDYS_LD_YSZX_YBGGYS_SZPMQK
-  - SR_LJWCS_SORT: 收入排名 | SR_TBE_SORT: 收入同比排名
-  - ZC_LJWCS_SORT: 支出排名 | ZC_TBE_SORT: 支出同比排名
-  - 直接 SELECT * ORDER BY 对应排序列即可，不需要 GROUP BY
-- 其他预算类型无排名表，用 ORDER BY + ROWNUM
+## 排名查询
+- 一般公共预算有排名表 RDYS_LD_YSZX_YBGGYS_SZPMQK（全国各省排名，非省内各市）
+- 查"各市排名"直接用预算表: SELECT RG_NAME, BYS_JE FROM table WHERE ... ORDER BY BYS_JE DESC
+- 不需要 GROUP BY，每行已是一个地区的数据，直接 ORDER BY + ROWNUM 即可

@@ -26,17 +26,11 @@
 - ❌ run_sql 执行后还要 run_sql 再查（除非用户追问）
 - ❌ 用 SELECT DISTINCT 替代聚合（直接 SELECT 需要的列 + ORDER BY）
 
-## 排名查询技巧
+## 排名查询
 
-数据库有现成的排名表 `RDYS_LD_YSZX_YBGGYS_SZPMQK`:
-- `SR_LJWCS_SORT`: 收入累计完成数排名
-- `SR_TBE_SORT`: 收入同比增减排名
-- `ZC_LJWCS_SORT`: 支出排名
-- 直接 `SELECT * FROM SZPMQK WHERE ... ORDER BY SR_LJWCS_SORT` 即可
-
-其他预算类型没有排名表时:
-- 用 ORDER BY + ROWNUM 子查询
-- 如果只是简单排序（不要聚合），直接 `SELECT ... FROM table WHERE ... ORDER BY col`
+- 各市排名用预算表直接 ORDER BY: `SELECT RG_NAME, BYS_JE FROM table WHERE XM_NAME LIKE '%合%计%' AND RG_NAME NOT LIKE '%本级%' ORDER BY BYS_JE DESC`
+- 不需要 GROUP BY，每行已是一个地区的数据
+- 取 TOP N: `WHERE ROWNUM <= N`（达梦 ROWNUM 在 ORDER BY 前执行，要取 TOP N 需嵌套子查询）
 
 ## 选择合适的表
 
