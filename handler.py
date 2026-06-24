@@ -111,18 +111,22 @@ class TextToSQLHandler(BaseHandler):
         result = db_schema.describe_table(args["table_name"])
 
         if result["status"] == "success":
-            cols_desc = "\n".join(
-                f"- {c['name']} ({c['type']}){' NULL' if c.get('nullable') else ' NOT NULL'}"
-                for c in result["columns"]
-            )
+            cols_desc_lines = []
+            for c in result["columns"][:15]:  # 只展示前15列
+                cols_desc_lines.append(
+                    f"- {c['name']} ({c['type']}){' NULL' if c.get('nullable') else ''}"
+                )
+            cols_desc = "\n".join(cols_desc_lines)
+            if result["column_count"] > 15:
+                cols_desc += f"\n... 还有{result['column_count']-15}列，如需查看全部列请再次 describe_table"
             sample = ""
             if result.get("sample_row"):
-                sample = f"\n样例数据: {result['sample_row']}"
+                sample = f"\n样例: {result['sample_row']}"
 
             return StepOutcome(
                 data=result,
-                next_prompt=f"表 {result['table_name']} 的结构（{result['column_count']}列）:\n{cols_desc}{sample}\n"
-                            f"现在可以根据列结构回答用户问题了。"
+                next_prompt=f"表 {result['table_name']}（{result['column_count']}列，展示前15列）:\n{cols_desc}{sample}\n"
+                            f"列结构已确认，直接 run_sql 查询。"
             )
         else:
             return StepOutcome(
@@ -174,8 +178,7 @@ class TextToSQLHandler(BaseHandler):
                 first_table = table_names[0] if table_names else ""
                 if first_table:
                     guidance = (
-                        f"\n[下一步] describe_table({first_table}) 查看结构 → "
-                        f"suggest_columns({first_table}, '完成情况/同比/排名') 选列 → run_sql 查询"
+                        f"\n[下一步] describe_table({first_table}) 查看结构后直接 run_sql 查询"
                     )
 
             return StepOutcome(

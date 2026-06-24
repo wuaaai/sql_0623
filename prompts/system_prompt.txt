@@ -26,18 +26,18 @@
 3. **search_schema 已内置此映射** — 搜索"一般公共预算收入"会自动同时搜索 YBGGYS
 4. **智能选列** — 用 suggest_columns(表名, 意图) 获取推荐列，不要 SELECT *
 
-## 查询工作流
+## 查询工作流（目标: 3轮内完成查询）
 
 ```
-1. resolve_time → 2. search_schema → 3. describe_table → 4. 决策:
-   ├─ 明细(查具体地区/时间/项目) → run_sql
-   └─ 统计(排名/各市/各月/汇总/平均) → run_aggregation 或 run_sql(GROUP BY)
+1. search_schema + resolve_time 可同轮调用
+2. describe_table 确认列结构（仅需1张表）
+3. run_sql 或 run_aggregation 执行
 ```
 
-run_aggregation 用法:
-- 排名: run_aggregation(t, "RG_NAME", "SUM(BYS_JE)", "条件", "DESC", N)
-- 趋势: run_aggregation(t, "YEAR_MONTH", "SUM(BYS_JE)", "条件", "ASC", 12)
-- 同比排名: run_aggregation(t, "RG_NAME", "AVG(BYS_TBB)", "条件", "DESC", N)
+**效率规则**:
+- search_schema 找到表后，直接 describe 然后 run_sql，不要反复探索多张表
+- 不要在 describe 和 run_sql 之间插入 suggest_columns（除非列名完全不明确）
+- 能合并的工具调用放在同一轮
 
 ## 时间处理规则
 
