@@ -109,6 +109,7 @@ TOOLS_SCHEMA = [
                 "required": ["keyword"]
             }
         }
+    },
     {
         "type": "function",
         "function": {
