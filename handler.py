@@ -8,7 +8,7 @@ dispatch(tool_name, args) → do_<tool_name>(args) → StepOutcome
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from tools import db_connection, db_query, db_schema, time_resolver, db_aggregation, db_cross_table, db_advanced
+from tools import db_connection, db_query, db_schema, time_resolver, db_aggregation, db_cross_table, db_advanced, error_handler
 
 
 @dataclass
@@ -17,6 +17,7 @@ class StepOutcome:
     data: Any              # 工具返回的数据
     next_prompt: Optional[str] = None  # 下一轮给LLM的提示
     should_exit: bool = False          # 是否终止对话
+    is_retry: bool = False             # 是否为错误重试（不消耗轮次）
 
 
 class BaseHandler:
@@ -36,6 +37,9 @@ class BaseHandler:
 
 class TextToSQLHandler(BaseHandler):
     """Text-to-SQL 工具处理器"""
+
+    def __init__(self):
+        self.retry_count = 0
 
     def do_connect_db(self, args: dict) -> StepOutcome:
         result = db_connection.connect_db(
@@ -82,12 +86,12 @@ class TextToSQLHandler(BaseHandler):
         result = db_query.run_sql(sql)
 
         if result["status"] == "success":
+            self.retry_count = 0
             if result["row_count"] == 0:
                 return StepOutcome(
                     data=result,
                     next_prompt=f"SQL 执行成功，但查询结果为空。\n"
-                                f"执行的SQL: {sql}\n"
-                                f"请告知用户没有匹配的数据。"
+                                f"执行的SQL: {sql}\n请告知用户没有匹配的数据。"
                 )
             else:
                 rows_display = _format_rows(result["columns"], result["rows"])
@@ -95,15 +99,30 @@ class TextToSQLHandler(BaseHandler):
                 return StepOutcome(
                     data=result,
                     next_prompt=f"SQL 执行成功，返回 {result['row_count']} 行数据。{warning}\n"
-                                f"列: {result['columns']}\n"
-                                f"数据:\n{rows_display}\n"
+                                f"列: {result['columns']}\n数据:\n{rows_display}\n"
                                 f"请用自然语言向用户解释这些结果。"
                 )
         else:
+            self.retry_count += 1
+            error_msg = result["message"]
+            error_type = error_handler.classify_error(error_msg)
+
+            if self.retry_count >= 3:
+                self.retry_count = 0
+                friendly = error_handler.get_friendly_msg(error_type)
+                return StepOutcome(
+                    data=result,
+                    next_prompt=f"经过3次尝试仍无法完成查询。{friendly}\n错误: {error_msg[:200]}\n请向用户友好解释并建议简化查询。",
+                    is_retry=False
+                )
+
+            table_name = args.get("table_name", "") or _extract_table_from_sql(sql)
+            fix_prompt = error_handler.suggest_fix(error_type, error_msg, table_name, sql)
+            tag = f"[第{self.retry_count}次自动修正]" if self.retry_count < 2 else "[最后一次自动修正]"
             return StepOutcome(
                 data=result,
-                next_prompt=f"SQL 执行失败: {result['message']}\n"
-                            f"请检查SQL语句是否正确，或使用 list_tables 确认表名。"
+                next_prompt=f"{tag}\n{fix_prompt}",
+                is_retry=True
             )
 
     def do_describe_table(self, args: dict) -> StepOutcome:
@@ -363,6 +382,13 @@ class TextToSQLHandler(BaseHandler):
             )
         else:
             return StepOutcome(data=result, next_prompt=f"异常检测失败: {result['message']}")
+
+
+def _extract_table_from_sql(sql: str) -> str:
+    """从SQL中提取表名（FROM后的第一个标识符）"""
+    import re
+    m = re.search(r'\bFROM\s+([a-zA-Z_][\w.]*)', sql, re.IGNORECASE)
+    return m.group(1) if m else ""
 
 
 def _format_ym(ym: str) -> str:

@@ -102,6 +102,7 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
         # 执行工具
         tool_results = []
         next_prompts = []
+        is_retry_turn = False
 
         for tc in tool_calls:
             outcome = handler.dispatch(tc["tool_name"], tc["args"])
@@ -109,6 +110,9 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
             if outcome.should_exit:
                 yield f"\n任务结束: {outcome.data}\n"
                 return
+
+            if outcome.is_retry:
+                is_retry_turn = True
 
             if outcome.data is not None:
                 result_str = json.dumps(outcome.data, ensure_ascii=False, default=_json_serial) \
@@ -124,6 +128,10 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
 
         if verbose and tool_results:
             yield f"工具返回 {len(tool_results)} 个结果\n"
+
+        # 错误重试不消耗轮次
+        if is_retry_turn:
+            turn -= 1
 
         # 构建下一轮 messages
         messages.append({

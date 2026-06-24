@@ -113,6 +113,8 @@
 - `query_efficiency.md` — 高效查询策略：合并工具调用/3轮完成/排名表用法
 - `schema_exploration.md` — 表探索：模糊搜索/结构查看/场景分类
 
+- `error_recovery.md` — 智能容错：错误分类/自动修正/友好降级
+
 ## 可用工具
 
 - resolve_time: 解析时间表达为SQL条件（无时间时自动用最新数据）
