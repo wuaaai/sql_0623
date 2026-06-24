@@ -97,8 +97,7 @@ class TextToSQLHandler(BaseHandler):
                     next_prompt=f"SQL 执行成功，返回 {result['row_count']} 行数据。{warning}\n"
                                 f"列: {result['columns']}\n"
                                 f"数据:\n{rows_display}\n"
-                                f"请用自然语言向用户展示和解释这些结果。"
-                                f"\n[提示] 下次查询前可用 suggest_columns(表名, 意图) 智能选列，避免 SELECT *。"
+                                f"请用自然语言向用户解释这些结果。"
                 )
         else:
             return StepOutcome(
@@ -133,7 +132,7 @@ class TextToSQLHandler(BaseHandler):
             return StepOutcome(
                 data=result,
                 next_prompt=f"表 {result['table_name']}（{result['column_count']}列）:\n{cols_desc}{amount_hint}{sample}\n"
-                            f"直接 run_sql 查询。排名用 ORDER BY 金额列 DESC。"
+                            f"直接查询。"
             )
         else:
             return StepOutcome(

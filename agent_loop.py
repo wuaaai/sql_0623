@@ -126,10 +126,9 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
             yield f"工具返回 {len(tool_results)} 个结果\n"
 
         # 构建下一轮 messages
-        # 添加 assistant 消息（含 tool_calls）
         messages.append({
             "role": "assistant",
-            "content": assistant_content,
+            "content": assistant_content[:500],
             "tool_calls": [
                 {
                     "id": tc["id"],
@@ -143,9 +142,20 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
             ]
         })
 
-        # 添加 tool 结果消息
+        # 添加 tool 结果消息（截断过长内容）
         for tr in tool_results:
+            content = tr.get("content", "")
+            if len(content) > 2000:
+                tr = {**tr, "content": content[:2000] + "...(截断)"}
             messages.append(tr)
+
+        # 周期性策略提示
+        if turn == 5:
+            messages.append({"role": "user", "content": "[策略] 如SQL反复报错: 检查列名、简化条件。如已找到数据直接回答。"})
+        elif turn == 10:
+            messages.append({"role": "user", "content": f"[进度] {turn}/{max_turns}轮。如卡住，给当前最佳SQL并说明困难。"})
+        elif turn == 15:
+            messages.append({"role": "user", "content": "[强制] 还剩5轮。必须本轮给出最终回答，不要再探索！"})
 
         # 如果没有工具结果可继续，退出
         if not next_prompts:
