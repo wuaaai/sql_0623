@@ -33,7 +33,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from openai import OpenAI
 from agent_loop import agent_runner_loop
 from tools.schema import TOOLS_SCHEMA
-from tools import db_connection, db_query
+from tools import db_connection, db_query, pattern_store
 
 
 # ==== 请求/响应模型 ====
@@ -173,6 +173,19 @@ def chat(req: ChatRequest):
             f"用户可能接着上次问，优先复用这些上下文。"
         )
 
+    # 注入相似历史查询模式
+    patterns = pattern_store.search_patterns(req.question, limit=3)
+    if patterns.get("matched", 0) > 0:
+        system_prompt += "\n\n[参考-相似历史查询]\n"
+        for i, p in enumerate(patterns.get("patterns", [])):
+            system_prompt += (
+                f"[模式{i+1}] 相似度{p.get('similarity',0)}% | "
+                f"用户曾问: {p.get('question','')[:80]} | "
+                f"表: {p.get('table','')} | "
+                f"SQL: {p.get('sql','')[:200]}\n"
+            )
+        system_prompt += "请参考以上模式的表名和列名改写SQL，不需要重新search_schema探索表结构。\n"
+
     # 追问次数限制：第3次(clarify_count>=2) 强制不追问
     if req.clarify_count >= 2:
         system_prompt += (
@@ -184,6 +197,7 @@ def chat(req: ChatRequest):
         )
 
     handler = ServerHandler()
+    handler.current_question = req.question
 
     # 在用户消息前注入工具调用指令，防止 LLM 跳过工具直接编造
     user_msg = f"[指令: 你必须调用工具获取真实数据后回答，禁止编造。]\n用户问题: {req.question}"
@@ -246,6 +260,7 @@ async def chat_stream(req: ChatRequest):
         system_prompt += "\n\n[强制] 已追问2次，必须直接查。时间→最新, 地区→全部, 项目→合计"
 
     handler = ServerHandler()
+    handler.current_question = req.question
 
     user_msg = f"[指令: 你必须调用工具获取真实数据后回答，禁止编造。]\n用户问题: {req.question}"
 

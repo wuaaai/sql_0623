@@ -8,7 +8,7 @@ dispatch(tool_name, args) → do_<tool_name>(args) → StepOutcome
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from tools import db_connection, db_query, db_schema, time_resolver, db_aggregation, db_cross_table, db_advanced, error_handler
+from tools import db_connection, db_query, db_schema, time_resolver, db_aggregation, db_cross_table, db_advanced, error_handler, pattern_store
 
 
 @dataclass
@@ -87,6 +87,15 @@ class TextToSQLHandler(BaseHandler):
 
         if result["status"] == "success":
             self.retry_count = 0
+            # 成功查询自动保存为可复用模式
+            if result.get("row_count", 0) > 0:
+                try:
+                    pattern_store.save_pattern(
+                        question=getattr(self, "current_question", ""),
+                        sql=sql
+                    )
+                except Exception:
+                    pass  # 模式保存失败不影响主流程
             if result["row_count"] == 0:
                 return StepOutcome(
                     data=result,
@@ -382,6 +391,24 @@ class TextToSQLHandler(BaseHandler):
             )
         else:
             return StepOutcome(data=result, next_prompt=f"异常检测失败: {result['message']}")
+
+
+    def do_search_patterns(self, args: dict) -> StepOutcome:
+        result = pattern_store.search_patterns(
+            keyword=args["keyword"],
+            budget_type=args.get("budget_type", ""),
+            limit=args.get("limit", 3)
+        )
+        if result["matched"] > 0:
+            patterns_desc = "\n".join(
+                f"[模式{i+1}] 相似度{p.get('similarity',0)}% | 用户曾问: {p.get('question','')[:80]} | 表: {p.get('table','')} | SQL: {p.get('sql','')[:150]}"
+                for i, p in enumerate(result.get("patterns", []))
+            )
+            return StepOutcome(
+                data=result,
+                next_prompt=f"找到{result['matched']}条相似历史查询:\n{patterns_desc}\n请参考以上模式的表名和列名改写SQL，不需要重新explore。"
+            )
+        return StepOutcome(data=result, next_prompt=f"未找到相似历史查询，正常探索表结构。总模式库: {result.get('total_patterns',0)}条。")
 
 
 def _extract_table_from_sql(sql: str) -> str:

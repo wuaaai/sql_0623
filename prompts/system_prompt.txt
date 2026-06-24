@@ -118,6 +118,7 @@
 ## 可用工具
 
 - resolve_time: 解析时间表达为SQL条件（无时间时自动用最新数据）
+- search_patterns: 检索相似历史查询模式（复用成功SQL模板）
 - search_schema: 按关键词搜索表（支持预算类型自动扩展）
 - describe_table: 查看表结构和样例
 - suggest_columns: 根据意图智能推荐列名

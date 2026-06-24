@@ -275,5 +275,21 @@ TOOLS_SCHEMA = [
                 "required": ["table", "value_col", "group_col"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_patterns",
+            "description": "检索历史成功查询模式。当用户的新问题与历史查询相似时，可参考历史SQL模板快速改写，避免重复探索表结构。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "keyword": {"type": "string", "description": "用户问题关键词"},
+                    "budget_type": {"type": "string", "description": "预算类型(可选)"},
+                    "limit": {"type": "integer", "description": "返回条数，默认3"}
+                },
+                "required": ["keyword"]
+            }
+        }
     }
 ]
