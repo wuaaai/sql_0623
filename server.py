@@ -21,6 +21,12 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 import asyncio
+import uuid
+from datetime import datetime
+
+# 会话目录
+SESSIONS_DIR = os.path.join(os.path.dirname(__file__), "sessions")
+os.makedirs(SESSIONS_DIR, exist_ok=True)
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -156,6 +162,17 @@ def chat(req: ChatRequest):
         with open(mem_path, "r", encoding="utf-8") as f:
             system_prompt += f"\n\n[全局记忆]\n{f.read()}"
 
+    # 注入会话上下文
+    session_ctx = _load_context()
+    if session_ctx.get("budget_type") or session_ctx.get("region"):
+        system_prompt += (
+            f"\n\n[会话上下文-复用]\n"
+            f"上次预算类型: {session_ctx.get('budget_type', '')}\n"
+            f"上次地区: {session_ctx.get('region', '')}\n"
+            f"上次时间: {session_ctx.get('time_period', '')}\n"
+            f"用户可能接着上次问，优先复用这些上下文。"
+        )
+
     # 追问次数限制：第3次(clarify_count>=2) 强制不追问
     if req.clarify_count >= 2:
         system_prompt += (
@@ -183,6 +200,9 @@ def chat(req: ChatRequest):
         verbose=False
     ):
         full_answer += chunk
+
+    # 自动保存查询历史
+    _append_history(req.question, handler.captured_sql or "")
 
     return ChatResponse(
         answer=full_answer.strip(),
@@ -214,6 +234,13 @@ async def chat_stream(req: ChatRequest):
         with open(mem_path, "r", encoding="utf-8") as f:
             system_prompt += f"\n\n[参考]\n{f.read()[:800]}"
 
+    # 注入会话上下文
+    session_ctx = _load_context()
+    if session_ctx.get("budget_type") or session_ctx.get("region"):
+        system_prompt += (
+            f"\n\n[会话上下文] 上次预算={session_ctx.get('budget_type','')} 地区={session_ctx.get('region','')} 时间={session_ctx.get('time_period','')}。优先复用。"
+        )
+
     # 追问限制
     if req.clarify_count >= 2:
         system_prompt += "\n\n[强制] 已追问2次，必须直接查。时间→最新, 地区→全部, 项目→合计"
@@ -239,6 +266,9 @@ async def chat_stream(req: ChatRequest):
                 yield f"data: {json.dumps({'type': 'text', 'text': chunk}, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0)
 
+        # 自动保存查询历史
+        _append_history(req.question, handler.captured_sql or "")
+
         # 发送最终结果
         result = {
             "type": "done",
@@ -249,6 +279,82 @@ async def chat_stream(req: ChatRequest):
         yield f"data: {json.dumps(result, ensure_ascii=False, default=str)}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+# ==== 会话管理 ====
+
+def _load_context():
+    """加载当前会话上下文"""
+    ctx_path = os.path.join(SESSIONS_DIR, "current.json")
+    if os.path.exists(ctx_path):
+        try:
+            with open(ctx_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {"budget_type": "", "region": "", "time_period": "", "last_table": "", "last_query": ""}
+
+
+def _save_context(ctx: dict):
+    """保存会话上下文"""
+    with open(os.path.join(SESSIONS_DIR, "current.json"), "w", encoding="utf-8") as f:
+        json.dump(ctx, f, ensure_ascii=False, indent=2)
+
+
+def _load_history():
+    """加载查询历史"""
+    hist_path = os.path.join(SESSIONS_DIR, "history.json")
+    if os.path.exists(hist_path):
+        try:
+            with open(hist_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    return []
+
+
+def _save_history(history: list):
+    """保存查询历史（最多50条）"""
+    with open(os.path.join(SESSIONS_DIR, "history.json"), "w", encoding="utf-8") as f:
+        json.dump(history[:50], f, ensure_ascii=False, indent=2)
+
+
+def _append_history(question: str, sql: str = ""):
+    """追加查询到历史"""
+    history = _load_history()
+    history.insert(0, {
+        "question": question,
+        "sql": sql[:500] if sql else "",
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M")
+    })
+    _save_history(history)
+
+
+class SessionSaveRequest(BaseModel):
+    budget_type: str = ""
+    region: str = ""
+    time_period: str = ""
+    last_table: str = ""
+    last_query: str = ""
+
+
+@app.post("/api/session/save")
+def session_save(req: SessionSaveRequest):
+    ctx = req.model_dump()
+    _save_context(ctx)
+    return {"status": "ok", "context": ctx}
+
+
+@app.get("/api/session/load")
+def session_load():
+    ctx = _load_context()
+    history = _load_history()
+    return {"status": "ok", "context": ctx, "history": history[:20]}
+
+
+@app.get("/api/session/list")
+def session_list():
+    return {"status": "ok", "history": _load_history()[:50]}
 
 
 # ==== 静态文件 ====
