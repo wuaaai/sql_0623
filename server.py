@@ -251,11 +251,17 @@ async def chat_stream(req: ChatRequest):
     # 注入会话上下文
     session_ctx = _load_context()
     if session_ctx.get("budget_type") or session_ctx.get("region"):
-        system_prompt += (
-            f"\n\n[会话上下文] 上次预算={session_ctx.get('budget_type','')} 地区={session_ctx.get('region','')} 时间={session_ctx.get('time_period','')}。优先复用。"
-        )
+        system_prompt += f"\n\n[会话上下文] 上次预算={session_ctx.get('budget_type','')} 地区={session_ctx.get('region','')}。优先复用。"
 
-    # 追问限制
+    # 注入相似历史查询模式
+    patterns = pattern_store.search_patterns(req.question, limit=3)
+    if patterns.get("matched", 0) > 0:
+        system_prompt += "\n\n[参考-相似历史查询]\n"
+        for i, p in enumerate(patterns.get("patterns", [])):
+            system_prompt += f"[模式{i+1}] 相似度{p.get('similarity',0)}% | 表:{p.get('table','')} | SQL:{p.get('sql','')[:150]}\n"
+        system_prompt += "请参考以上模式的表名和列名改写SQL，不需要重新explore。\n"
+
+    # 追问限制（流式端点）
     if req.clarify_count >= 2:
         system_prompt += "\n\n[强制] 已追问2次，必须直接查。时间→最新, 地区→全部, 项目→合计"
 
