@@ -43,6 +43,7 @@ class ConnectRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str
+    clarify_count: int = 0
 
 
 class ChatResponse(BaseModel):
@@ -153,6 +154,16 @@ def chat(req: ChatRequest):
     if os.path.exists(mem_path):
         with open(mem_path, "r", encoding="utf-8") as f:
             system_prompt += f"\n\n[全局记忆]\n{f.read()}"
+
+    # 追问次数限制：第3次(clarify_count>=2) 强制不追问
+    if req.clarify_count >= 2:
+        system_prompt += (
+            "\n\n[强制规则] 你已经追问了2次，本次必须直接执行查询，不能再追问。"
+            "缺失的条件使用默认值：\n"
+            "- 时间→用 resolve_time(\"\") 获取最新数据\n"
+            "- 地区→不筛选\n"
+            "- 项目→用\"合计\"\n"
+        )
 
     handler = ServerHandler()
 

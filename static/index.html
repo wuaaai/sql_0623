@@ -633,6 +633,7 @@ const app = createApp({
     const tables = ref([])
     const msgContainer = ref(null)
     const model = ref('')
+    const clarifyCount = ref(0)
 
     const connForm = ref({
       db_type: 'dameng',
@@ -727,7 +728,7 @@ const app = createApp({
         const res = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question })
+          body: JSON.stringify({ question, clarify_count: clarifyCount.value })
         })
         const data = await res.json()
 
@@ -738,6 +739,14 @@ const app = createApp({
         aiMsg.columns = data.columns || []
         aiMsg.rows = data.rows || []
         aiMsg.row_count = data.rows ? data.rows.length : 0
+
+        // 检测是否为追问 → 更新追问计数器
+        const answer = data.answer || ''
+        if (answer.includes('？') || answer.includes('?')) {
+          clarifyCount.value += 1
+        } else {
+          clarifyCount.value = 0  // 正常回答，重置计数
+        }
 
         scrollToBottom()
       } catch (e) {
@@ -807,7 +816,7 @@ const app = createApp({
 
     return {
       sidebarOpen, connected, connecting, loading,
-      inputText, messages, tables, msgContainer, model,
+      inputText, messages, tables, msgContainer, model, clarifyCount,
       connForm, quickQuestions,
       doConnect, loadTables, sendMessage, quickQuery,
       highlightSQL, copySQL, renderMarkdown
