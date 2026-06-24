@@ -29,13 +29,15 @@
 ## 查询工作流
 
 ```
-用户口语描述
-  → resolve_time(用户时间表达) 解析时间条件（无时间→自动用最新数据）
-  → search_schema(关键词) 定位表
-  → describe_table(表名) 确认列结构
-  → suggest_columns(表名, 意图) 获取推荐列
-  → run_sql(带WHERE条件) 执行查询
+1. resolve_time → 2. search_schema → 3. describe_table → 4. 决策:
+   ├─ 明细(查具体地区/时间/项目) → run_sql
+   └─ 统计(排名/各市/各月/汇总/平均) → run_aggregation 或 run_sql(GROUP BY)
 ```
+
+run_aggregation 用法:
+- 排名: run_aggregation(t, "RG_NAME", "SUM(BYS_JE)", "条件", "DESC", N)
+- 趋势: run_aggregation(t, "YEAR_MONTH", "SUM(BYS_JE)", "条件", "ASC", 12)
+- 同比排名: run_aggregation(t, "RG_NAME", "AVG(BYS_TBB)", "条件", "DESC", N)
 
 ## 时间处理规则
 
