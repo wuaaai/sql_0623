@@ -528,7 +528,7 @@
 
           <!-- AI 文字回答 -->
           <template v-if="msg.role === 'assistant' && msg.answer_text">
-            <div v-if="msg.streaming" style="white-space:pre-wrap;">{{ msg.answer_text }}</div>
+            <div v-if="msg.loading" style="white-space:pre-wrap;">{{ msg.answer_text }}</div>
             <div v-else v-html="renderMarkdown(msg.answer_text)"></div>
           </template>
 
@@ -751,7 +751,6 @@ const app = createApp({
                 const event = JSON.parse(line.slice(6))
                 if (event.type === 'text') {
                   aiMsg.answer_text += event.text
-                  aiMsg.loading = false
                 } else if (event.type === 'tool') {
                   // 工具调用提示（可选展示）
                 } else if (event.type === 'done') {
