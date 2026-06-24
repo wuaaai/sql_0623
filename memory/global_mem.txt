@@ -56,6 +56,17 @@
 - RDYS_BAS_INCOMESORT(收入分类): INCOMESORT_CODE → 执行表
 - 使用 find_relations 工具发现两表的关联键
 
+## 窗口函数语法（达梦支持）
+- SUM(col) OVER(): 窗口合计（占比分母）
+- LAG(col, n) OVER (PARTITION BY x ORDER BY y): 前n行值（环比）
+- RANK() OVER(): 排名 | PERCENT_RANK(): 百分位排名
+- NTILE(n) OVER(): 分n档
+- AVG/STDDEV OVER(): 窗口均值/标准差（异常检测）
+
+## 异常检测阈值
+- threshold=2.0: 常规(95%置信区间外)
+- threshold=3.0: 极端(99.7%外)，用于重大发现汇报
+
 ### 跨表查询策略
 - 对比 → 分别查两张表 + LLM综合
 - 合并排名 → union_query 或 run_sql(UNION ALL)

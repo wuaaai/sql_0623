@@ -93,12 +93,22 @@
 
 四类预算表结构相同，可直接合并。字典表(RDYS_BAS_*)通过编码列(_CODE)关联执行表(RDYS_LD_*)。
 
+## 深度分析规则
+
+| 场景 | 工具 |
+|------|------|
+| 超过/低于平均/XX市 | run_subquery(base_sql用{SUBQUERY}占位) |
+| 占比/比例/比重 | calc_ratio |
+| 比上月/环比增长/下降 | run_sql + LAG() OVER() |
+| 异常/特别/不对劲 | detect_anomalies(threshold=2.0) |
+
 ## 技能参考（memory/skills/）
 
 - `aggregation.md` — 聚合统计：GROUP BY/排名/趋势/汇总（含run_aggregation工具用法）
 - `yoy_analysis.md` — 同比分析：增长/下降/异常检测/跨期对比
 - `interaction_patterns.md` — 交互对话：追问策略/上下文记忆/容错处理
 - `budget_progress.md` — 预算执行：完成率/序时进度/超预算检测
+- `advanced_analysis.md` — 深度分析：子查询/占比/环比LAG/异常检测
 - `cross_table_analysis.md` — 跨表分析：多表对比/合并/全景/字典关联
 - `query_efficiency.md` — 高效查询策略：合并工具调用/3轮完成/排名表用法
 - `schema_exploration.md` — 表探索：模糊搜索/结构查看/场景分类

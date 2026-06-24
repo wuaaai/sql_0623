@@ -8,7 +8,7 @@ dispatch(tool_name, args) → do_<tool_name>(args) → StepOutcome
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from tools import db_connection, db_query, db_schema, time_resolver, db_aggregation, db_cross_table
+from tools import db_connection, db_query, db_schema, time_resolver, db_aggregation, db_cross_table, db_advanced
 
 
 @dataclass
@@ -318,6 +318,52 @@ class TextToSQLHandler(BaseHandler):
                 next_prompt=f"合并查询失败: {result['message']}\n"
                             f"请先用 find_relations 确认表结构是否适合合并。"
             )
+
+    def do_run_subquery(self, args: dict) -> StepOutcome:
+        result = db_advanced.run_subquery(
+            table=args["table"],
+            base_sql=args["base_sql"],
+            subquery_sql=args["subquery_sql"]
+        )
+        if result["status"] == "success":
+            rows_display = _format_rows(result["columns"], result["rows"])
+            return StepOutcome(
+                data=result,
+                next_prompt=f"子查询完成。子查询结果={result.get('subquery_result')}，外层返回{result['row_count']}行。\n数据:\n{rows_display}\n请向用户解释哪些满足条件。"
+            )
+        else:
+            return StepOutcome(data=result, next_prompt=f"子查询失败: {result['message']}")
+
+    def do_calc_ratio(self, args: dict) -> StepOutcome:
+        result = db_advanced.calc_ratio(
+            table=args["table"], value_col=args["value_col"],
+            group_col=args["group_col"], filters=args.get("filters", "")
+        )
+        if result["status"] == "success":
+            rows_display = _format_rows(result["columns"], result["rows"])
+            return StepOutcome(
+                data=result,
+                next_prompt=f"占比计算完成，总和={result['total_pct']}%。\n数据:\n{rows_display}\n请解释各分组占比，标出最高/最低。"
+            )
+        else:
+            return StepOutcome(data=result, next_prompt=f"占比失败: {result['message']}")
+
+    def do_detect_anomalies(self, args: dict) -> StepOutcome:
+        result = db_advanced.detect_anomalies(
+            table=args["table"], value_col=args["value_col"],
+            group_col=args["group_col"], filters=args.get("filters", ""),
+            threshold=args.get("threshold", 2.0)
+        )
+        if result["status"] == "success":
+            if result.get("anomaly_count", 0) == 0:
+                return StepOutcome(data=result, next_prompt=f"异常检测: 未发现异常值。均值={result.get('stats',{})}")
+            rows_display = _format_rows(result["columns"], result["rows"])
+            return StepOutcome(
+                data=result,
+                next_prompt=f"异常检测: {result['total_count']}行中发现{result['anomaly_count']}个异常(阈值±{result['threshold']}σ)。\n统计: {result.get('stats',{})}\n异常数据:\n{rows_display}\n请解释哪些是异常。"
+            )
+        else:
+            return StepOutcome(data=result, next_prompt=f"异常检测失败: {result['message']}")
 
 
 def _format_ym(ym: str) -> str:

@@ -224,5 +224,56 @@ TOOLS_SCHEMA = [
                 "required": ["tables", "select_cols", "group_by", "aggregate"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_subquery",
+            "description": "带子查询的两阶段查询。先执行子查询获取标量值(如平均值)，再嵌入外层SQL执行。用于'超过全省平均'、'比XX市高'等与聚合值比较的场景。base_sql中用{SUBQUERY}占位。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table": {"type": "string", "description": "主表名"},
+                    "base_sql": {"type": "string", "description": "外层SQL模板，用{SUBQUERY}占位子查询结果"},
+                    "subquery_sql": {"type": "string", "description": "子查询SQL，必须返回单个标量值"}
+                },
+                "required": ["table", "base_sql", "subquery_sql"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "calc_ratio",
+            "description": "计算占比：每个分组值占总计的百分比。使用窗口函数SUM() OVER()。用于'各地市占全省比例'、'税收占比'等场景。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table": {"type": "string", "description": "表名"},
+                    "value_col": {"type": "string", "description": "数值列名，如BYS_JE"},
+                    "group_col": {"type": "string", "description": "分组列名，如RG_NAME"},
+                    "filters": {"type": "string", "description": "WHERE条件(可选)"}
+                },
+                "required": ["table", "value_col", "group_col"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "detect_anomalies",
+            "description": "异常检测：计算均值和标准差，标记超出均值±threshold倍标准差的离群值。threshold默认2.0(95%置信区间)。用于'有没有异常'、'收入特别高/低'等场景。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table": {"type": "string", "description": "表名"},
+                    "value_col": {"type": "string", "description": "检测的数值列"},
+                    "group_col": {"type": "string", "description": "分组标识列，如RG_NAME"},
+                    "filters": {"type": "string", "description": "WHERE条件(可选)"},
+                    "threshold": {"type": "number", "description": "标准差倍数阈值，默认2.0"}
+                },
+                "required": ["table", "value_col", "group_col"]
+            }
+        }
     }
 ]
