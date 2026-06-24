@@ -41,3 +41,10 @@
 ## 项目名称常见值
 - "合    计" / "合计" / "一、收入合计"
 - "一、税收收入" / "二、非税收入"
+
+## 排名查询（重要）
+- 一般公共预算有专门排名表: RDYS_LD_YSZX_YBGGYS_SZPMQK
+  - SR_LJWCS_SORT: 收入排名 | SR_TBE_SORT: 收入同比排名
+  - ZC_LJWCS_SORT: 支出排名 | ZC_TBE_SORT: 支出同比排名
+  - 直接 SELECT * ORDER BY 对应排序列即可，不需要 GROUP BY
+- 其他预算类型无排名表，用 ORDER BY + ROWNUM

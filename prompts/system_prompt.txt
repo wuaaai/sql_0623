@@ -82,7 +82,7 @@
 - `yoy_analysis.md` — 同比分析：增长/下降/异常检测/跨期对比
 - `interaction_patterns.md` — 交互对话：追问策略/上下文记忆/容错处理
 - `budget_progress.md` — 预算执行：完成率/序时进度/超预算检测
-- `sql_generation.md` — SQL生成：条件模式/达梦语法/列选择
+- `query_efficiency.md` — 高效查询策略：合并工具调用/3轮完成/排名表用法
 - `schema_exploration.md` — 表探索：模糊搜索/结构查看/场景分类
 
 ## 可用工具
