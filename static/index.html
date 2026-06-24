@@ -435,50 +435,12 @@
       </el-button>
     </div>
     <div class="sidebar-body">
-      <!-- 数据库连接 -->
+      <!-- 数据库连接状态 -->
       <div class="sidebar-section">
-        <h3>数据库连接</h3>
-        <el-form :model="connForm" label-position="top" size="small">
-          <el-form-item label="类型">
-            <el-select v-model="connForm.db_type" style="width:100%">
-              <el-option label="达梦 (Dameng)" value="dameng" />
-              <el-option label="MySQL" value="mysql" />
-              <el-option label="SQLite" value="sqlite" />
-            </el-select>
-          </el-form-item>
-          <template v-if="connForm.db_type !== 'sqlite'">
-            <el-row :gutter="8">
-              <el-col :span="16">
-                <el-form-item label="主机">
-                  <el-input v-model="connForm.host" placeholder="localhost" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="端口">
-                  <el-input v-model.number="connForm.port" placeholder="5236" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-            <el-form-item label="用户名">
-              <el-input v-model="connForm.user" placeholder="SYSDBA" />
-            </el-form-item>
-            <el-form-item label="密码">
-              <el-input v-model="connForm.password" type="password" show-password placeholder="密码" />
-            </el-form-item>
-            <el-form-item label="模式 (Schema)">
-              <el-input v-model="connForm.schema" placeholder="RDYS_PUBLIC_TBS" />
-            </el-form-item>
-          </template>
-          <el-form-item v-if="connForm.db_type === 'sqlite'" label="文件路径">
-            <el-input v-model="connForm.database" placeholder="temp/test.db" />
-          </el-form-item>
-          <el-button type="primary" @click="doConnect" :loading="connecting" style="width:100%">
-            {{ connecting ? '连接中...' : '连接数据库' }}
-          </el-button>
-        </el-form>
-        <div style="margin-top:8px;font-size:12px;color:#909399;">
+        <h3>数据库状态</h3>
+        <div style="font-size:13px;color:#606266;">
           <span class="status-dot" :class="connected ? 'connected' : 'disconnected'"></span>
-          {{ connected ? '已连接' : '未连接' }}
+          {{ connected ? '达梦 · RDYS_PUBLIC_TBS' : '未连接' }}
         </div>
       </div>
 
@@ -576,7 +538,7 @@
     <div class="empty-chat" v-else>
       <el-icon><ChatLineSquare /></el-icon>
       <h3>Text-to-SQL 助手</h3>
-      <p>连接数据库后，用自然语言描述查询需求</p>
+      <p>用自然语言描述查询需求，系统自动查询数据库</p>
       <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
         <el-tag
           v-for="q in quickQuestions" :key="q"
@@ -594,14 +556,14 @@
           v-model="inputText"
           placeholder="输入查询需求，例如：查询所有用户数据"
           @keyup.enter.exact="sendMessage(inputText)"
-          :disabled="!connected || loading"
+          :disabled="loading"
           size="large"
         />
         <el-button
           type="primary"
           size="large"
           @click="sendMessage(inputText)"
-          :disabled="!connected || loading || !inputText.trim()"
+          :disabled="loading || !inputText.trim()"
           :loading="loading"
         >
           发送
