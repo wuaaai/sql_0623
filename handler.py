@@ -147,14 +147,13 @@ class TextToSQLHandler(BaseHandler):
             amount_hint = ""
             if amount_cols:
                 amount_hint = f"\n金额列: {', '.join(amount_cols[:8])}"
-                # 采样RG_NAME判断数据粒度
+                # 采样XM_NAME判断数据粒度（市县数据在XM_NAME列，不在RG_NAME）
                 try:
                     from tools import db_query
-                    sample_rows = db_query.run_sql(f"SELECT DISTINCT RG_NAME FROM {result['table_name']} WHERE ROWNUM <= 6")
-                    regions = [r.get('RG_NAME','') for r in (sample_rows.get('rows') or [])]
-                    unique = len(set(regions))
-                    if unique <= 2:
-                        amount_hint += f"\n[粒度: 省级] 仅含{', '.join(regions[:3])}数据，无地市明细。不要尝试查市级。"
+                    sample_rows = db_query.run_sql(f"SELECT DISTINCT XM_NAME FROM {result['table_name']} WHERE XM_NAME NOT LIKE '%合计%' AND ROWNUM <= 10")
+                    cities = [r.get('XM_NAME','') for r in (sample_rows.get('rows') or [])]
+                    if cities:
+                        amount_hint += f"\n[含市县数据] XM_NAME中有: {', '.join(cities[:5])}"
                 except Exception:
                     pass
 

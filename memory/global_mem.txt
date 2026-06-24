@@ -77,3 +77,11 @@
 - 一般公共预算有排名表 RDYS_LD_YSZX_YBGGYS_SZPMQK（全国各省排名，非省内各市）
 - 查"各市排名"直接用预算表: SELECT RG_NAME, BYS_JE FROM table WHERE ... ORDER BY BYS_JE DESC
 - 不需要 GROUP BY，每行已是一个地区的数据，直接 ORDER BY + ROWNUM 即可
+
+## 重要: 市县数据查XM_NAME而非RG_NAME
+
+**RG_NAME 固定为"河北省"或"河北省本级"——是省级汇总。**
+**市县数据在 XM_NAME 列中**，例如"衡水市""赞皇县""石家庄市本级"。
+查某市县: `WHERE XM_NAME LIKE '%衡水市%'`
+查各区县: `WHERE XM_NAME LIKE '%县%'`
+查各地市(排除合计): `WHERE XM_NAME NOT LIKE '%合计%'`
