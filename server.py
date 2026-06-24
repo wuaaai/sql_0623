@@ -148,13 +148,7 @@ def chat(req: ChatRequest):
 
     # 注入连接上下文
     conn = db_connection._conn_info or {}
-    system_prompt += (
-        f"\n\n[当前数据库连接状态]\n"
-        f"数据库类型: {conn.get('db_type', '')}\n"
-        f"模式: {conn.get('schema', '')}\n"
-        f"数据库已连接，请直接使用 list_tables 和 run_sql 响应用户需求。"
-        f"不要再调用 connect_db。"
-    )
+    system_prompt += f"\n\n[DB: dameng, schema={conn.get('schema', '')}, 已连接。禁止调connect_db，直接调run_sql查数据。]"
 
     # 注入全局记忆
     mem_path = os.path.join(os.path.dirname(__file__), "memory", "global_mem.txt")
@@ -210,7 +204,7 @@ def chat(req: ChatRequest):
     handler.current_question = req.question
 
     # 在用户消息前注入工具调用指令，防止 LLM 跳过工具直接编造
-    user_msg = f"[指令: 你必须调用工具获取真实数据后回答，禁止编造。]\n用户问题: {req.question}"
+    user_msg = f"[强制] 你必须调用工具(run_sql/describe_table)获取真实数据后回答。禁止编造、禁止说'连接失败'。数据库已连接正常。\n用户问题: {req.question}"
 
     # 收集 agent 输出
     full_answer = ""
@@ -293,7 +287,7 @@ async def chat_stream(req: ChatRequest):
     handler = ServerHandler()
     handler.current_question = req.question
 
-    user_msg = f"[指令: 你必须调用工具获取真实数据后回答，禁止编造。]\n用户问题: {req.question}"
+    user_msg = f"[强制] 你必须调用工具(run_sql/describe_table)获取真实数据后回答。禁止编造、禁止说'连接失败'。数据库已连接正常。\n用户问题: {req.question}"
 
     async def generate():
         for chunk in agent_runner_loop(
