@@ -44,34 +44,60 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
         if verbose:
             yield f"\n**第 {turn} 轮...**\n"
 
-        # 调用 LLM
-        response = client.chat.completions.create(
+        # 调用 LLM（流式）
+        stream = client.chat.completions.create(
             model=client.model,
             messages=messages,
             tools=tools_schema,
-            tool_choice="auto"
+            tool_choice="auto",
+            stream=True
         )
 
-        assistant_msg = response.choices[0].message
+        # 收集流式响应
+        assistant_content = ""
+        tool_call_data = {}  # index -> {id, name, arguments}
+        for chunk in stream:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta is None:
+                continue
+            # 文本内容
+            if delta.content:
+                assistant_content += delta.content
+                yield delta.content
+            # 工具调用
+            if delta.tool_calls:
+                for tc in delta.tool_calls:
+                    idx = tc.index
+                    if idx not in tool_call_data:
+                        tool_call_data[idx] = {"id": tc.id or "", "name": "", "arguments": ""}
+                    if tc.id:
+                        tool_call_data[idx]["id"] = tc.id
+                    if tc.function:
+                        if tc.function.name:
+                            tool_call_data[idx]["name"] += tc.function.name
+                        if tc.function.arguments:
+                            tool_call_data[idx]["arguments"] += tc.function.arguments
 
         # 没有工具调用 → LLM 给出了最终回答
-        if not assistant_msg.tool_calls:
-            final_answer = assistant_msg.content or ""
-            yield final_answer
+        if not tool_call_data:
             break
 
         # 解析工具调用
         tool_calls = []
-        for tc in assistant_msg.tool_calls:
+        for tc_data in tool_call_data.values():
+            try:
+                args = json.loads(tc_data["arguments"])
+            except (json.JSONDecodeError, TypeError):
+                args = {}
             tool_calls.append({
-                "tool_name": tc.function.name,
-                "args": json.loads(tc.function.arguments),
-                "id": tc.id
+                "tool_name": tc_data["name"],
+                "args": args,
+                "id": tc_data["id"]
             })
 
         if verbose:
             for tc in tool_calls:
-                yield f"🛠️ 调用工具: {tc['tool_name']}({json.dumps(tc['args'], ensure_ascii=False)})\n"
+                yield f"\n🛠️ {tc['tool_name']}({json.dumps(tc['args'], ensure_ascii=False)})\n"
 
         # 执行工具
         tool_results = []
@@ -103,7 +129,7 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
         # 添加 assistant 消息（含 tool_calls）
         messages.append({
             "role": "assistant",
-            "content": assistant_msg.content,
+            "content": assistant_content,
             "tool_calls": [
                 {
                     "id": tc["id"],
