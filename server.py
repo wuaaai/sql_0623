@@ -97,9 +97,15 @@ class ServerHandler(TextToSQLHandler):
         self.captured_sql = None
         self.captured_columns = None
         self.captured_rows = None
+        self.captured_table = None
 
     def do_run_sql(self, args: dict) -> StepOutcome:
         self.captured_sql = args.get("sql", "")
+        # 从SQL提取表名
+        import re
+        m = re.search(r'\bFROM\s+([a-zA-Z_][\w.]*)', self.captured_sql or "", re.IGNORECASE)
+        if m:
+            self.captured_table = m.group(1)
         outcome = super().do_run_sql(args)
         if outcome.data and outcome.data.get("status") == "success":
             self.captured_columns = outcome.data.get("columns", [])
@@ -156,15 +162,15 @@ def chat(req: ChatRequest):
         with open(mem_path, "r", encoding="utf-8") as f:
             system_prompt += f"\n\n[全局记忆]\n{f.read()}"
 
-    # 注入会话上下文
+    # 注入会话上下文(上一轮的查询摘要)
     session_ctx = _load_context()
-    if session_ctx.get("budget_type") or session_ctx.get("region"):
+    if session_ctx.get("last_table") or session_ctx.get("last_question"):
         system_prompt += (
-            f"\n\n[会话上下文-复用]\n"
-            f"上次预算类型: {session_ctx.get('budget_type', '')}\n"
-            f"上次地区: {session_ctx.get('region', '')}\n"
-            f"上次时间: {session_ctx.get('time_period', '')}\n"
-            f"用户可能接着上次问，优先复用这些上下文。"
+            f"\n\n[上一轮查询] 用户刚问过: {session_ctx.get('last_question','')[:100]}\n"
+            f"使用的表: {session_ctx.get('last_table','')}\n"
+            f"SQL: {session_ctx.get('last_sql','')[:200]}\n"
+            f"预算类型: {session_ctx.get('budget_type','')} | 时间: {session_ctx.get('time_period','')}\n"
+            f"【用户当前问题是上一轮的追问，复用上一轮的表名和上下文，只改筛选条件。】\n"
         )
 
     # 注入相似历史查询模式
@@ -225,6 +231,16 @@ def chat(req: ChatRequest):
             pattern_store.save_pattern(req.question, handler.captured_sql)
         except Exception:
             pass
+
+    # 保存查询摘要到会话上下文（下一轮复用）
+    try:
+        ctx = _load_context()
+        ctx["last_question"] = req.question[:100]
+        ctx["last_table"] = handler.captured_table or _extract_table_from_sql(handler.captured_sql or "")
+        ctx["last_sql"] = (handler.captured_sql or "")[:300]
+        _save_context(ctx)
+    except Exception:
+        pass
 
     # 自动保存查询历史
     _append_history(req.question, handler.captured_sql or "")
