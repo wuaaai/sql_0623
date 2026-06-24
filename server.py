@@ -176,15 +176,25 @@ def chat(req: ChatRequest):
     # 注入相似历史查询模式
     patterns = pattern_store.search_patterns(req.question, limit=3)
     if patterns.get("matched", 0) > 0:
-        system_prompt += "\n\n[参考-相似历史查询]\n"
-        for i, p in enumerate(patterns.get("patterns", [])):
+        top = patterns["patterns"][0]
+        if top.get("similarity", 0) >= 80:
+            # 高相似度：直接复用，跳过探索
             system_prompt += (
-                f"[模式{i+1}] 相似度{p.get('similarity',0)}% | "
-                f"用户曾问: {p.get('question','')[:80]} | "
-                f"表: {p.get('table','')} | "
-                f"SQL: {p.get('sql','')[:200]}\n"
+                f"\n\n[强制-复用历史模式 相似度{top.get('similarity',0)}%]\n"
+                f"历史问题: {top.get('question','')[:100]}\n"
+                f"表名: {top.get('table','')}\n"
+                f"SQL: {top.get('sql','')[:300]}\n"
+                f"【禁止调用 search_schema 和 describe_table。直接用上表名写SQL执行 run_sql。】\n"
             )
-        system_prompt += "请参考以上模式的表名和列名改写SQL，不需要重新search_schema探索表结构。\n"
+        else:
+            system_prompt += "\n\n[参考-相似历史查询]\n"
+            for i, p in enumerate(patterns.get("patterns", [])):
+                system_prompt += (
+                    f"[模式{i+1}] 相似度{p.get('similarity',0)}% | "
+                    f"表: {p.get('table','')} | "
+                    f"SQL: {p.get('sql','')[:150]}\n"
+                )
+            system_prompt += "请参考以上模式，不需要重新探索表结构。\n"
 
     # 追问次数限制：第3次(clarify_count>=2) 强制不追问
     if req.clarify_count >= 2:
@@ -256,10 +266,18 @@ async def chat_stream(req: ChatRequest):
     # 注入相似历史查询模式
     patterns = pattern_store.search_patterns(req.question, limit=3)
     if patterns.get("matched", 0) > 0:
-        system_prompt += "\n\n[参考-相似历史查询]\n"
-        for i, p in enumerate(patterns.get("patterns", [])):
-            system_prompt += f"[模式{i+1}] 相似度{p.get('similarity',0)}% | 表:{p.get('table','')} | SQL:{p.get('sql','')[:150]}\n"
-        system_prompt += "请参考以上模式的表名和列名改写SQL，不需要重新explore。\n"
+        top = patterns["patterns"][0]
+        if top.get("similarity", 0) >= 80:
+            system_prompt += (
+                f"\n\n[强制-复用 相似度{top.get('similarity',0)}%] "
+                f"表名:{top.get('table','')} SQL:{top.get('sql','')[:200]}\n"
+                f"禁止调 search_schema 和 describe_table，直接用上表名写SQL执行 run_sql。\n"
+            )
+        else:
+            system_prompt += "\n\n[参考-相似历史查询]\n"
+            for p in patterns.get("patterns", []):
+                system_prompt += f"[模式] 表:{p.get('table','')} SQL:{p.get('sql','')[:150]}\n"
+            system_prompt += "参考以上模式，不需要重新探索。\n"
 
     # 追问限制（流式端点）
     if req.clarify_count >= 2:
