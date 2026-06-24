@@ -8,7 +8,7 @@ dispatch(tool_name, args) → do_<tool_name>(args) → StepOutcome
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from tools import db_connection, db_query, db_schema, time_resolver
+from tools import db_connection, db_query, db_schema, time_resolver, db_aggregation
 
 
 @dataclass
@@ -229,6 +229,33 @@ class TextToSQLHandler(BaseHandler):
             return StepOutcome(
                 data=result,
                 next_prompt=f"时间解析失败: {result['message']}"
+            )
+
+    def do_run_aggregation(self, args: dict) -> StepOutcome:
+        result = db_aggregation.run_aggregation(
+            table_name=args["table_name"],
+            group_by=args["group_by"],
+            aggregate=args["aggregate"],
+            filters=args.get("filters", ""),
+            order=args.get("order", "DESC"),
+            limit=args.get("limit", 20)
+        )
+
+        if result["status"] == "success":
+            rows_display = _format_rows(result["columns"], result["rows"])
+            return StepOutcome(
+                data=result,
+                next_prompt=f"聚合查询成功，返回 {result['row_count']} 行。\n"
+                            f"SQL: {result.get('sql', '')}\n"
+                            f"分组: {result['group_by']} | 聚合: {result['aggregate']}\n"
+                            f"数据:\n{rows_display}\n"
+                            f"请用自然语言向用户解释结果，标注最高/最低值。"
+            )
+        else:
+            return StepOutcome(
+                data=result,
+                next_prompt=f"聚合查询失败: {result['message']}\n"
+                            f"请检查表名、分组列、聚合表达式是否正确，先用 describe_table 确认。"
             )
 
 

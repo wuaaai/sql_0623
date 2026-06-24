@@ -151,5 +151,43 @@ TOOLS_SCHEMA = [
                 "required": ["expression"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_aggregation",
+            "description": "执行聚合统计查询（GROUP BY + 聚合函数 + 排序 + TOP N）。当用户问各市/各地/各月/排名/最高/最低/平均/汇总/趋势时使用。自动处理达梦ROWNUM+ORDER BY子查询。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table_name": {
+                        "type": "string",
+                        "description": "表名"
+                    },
+                    "group_by": {
+                        "type": "string",
+                        "description": "分组列名，如 RG_NAME（按地区）、YEAR_MONTH（按时间）、XM_NAME（按项目）"
+                    },
+                    "aggregate": {
+                        "type": "string",
+                        "description": "聚合表达式，如 SUM(BYS_JE)、AVG(BYS_TBB)、COUNT(*)、MAX(BYS_JE)"
+                    },
+                    "filters": {
+                        "type": "string",
+                        "description": "额外的WHERE条件（不含ROWNUM），如 XM_NAME LIKE '%合计%' AND YEAR_MONTH = '202604'"
+                    },
+                    "order": {
+                        "type": "string",
+                        "enum": ["DESC", "ASC"],
+                        "description": "排序方向，默认DESC（从高到低）"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "返回行数，默认20"
+                    }
+                },
+                "required": ["table_name", "group_by", "aggregate"]
+            }
+        }
     }
 ]
