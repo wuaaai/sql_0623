@@ -8,7 +8,7 @@ dispatch(tool_name, args) → do_<tool_name>(args) → StepOutcome
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from tools import db_connection, db_query, db_schema
+from tools import db_connection, db_query, db_schema, time_resolver
 
 
 @dataclass
@@ -210,6 +210,33 @@ class TextToSQLHandler(BaseHandler):
                 data=result,
                 next_prompt=f"获取推荐列失败: {result['message']}"
             )
+
+    def do_resolve_time(self, args: dict) -> StepOutcome:
+        result = time_resolver.resolve_time(
+            expression=args.get("expression", ""),
+            context_month=args.get("context_month")
+        )
+
+        if result["status"] == "success":
+            return StepOutcome(
+                data=result,
+                next_prompt=f"时间解析结果: {result['resolved']}\n"
+                            f"WHERE 条件: {result['where_clause']}\n"
+                            f"数据库最新数据: {_format_ym(result.get('latest_month',''))}\n"
+                            f"请在 SQL 的 WHERE 子句中使用此条件。"
+            )
+        else:
+            return StepOutcome(
+                data=result,
+                next_prompt=f"时间解析失败: {result['message']}"
+            )
+
+
+def _format_ym(ym: str) -> str:
+    """202501 → 2025年1月"""
+    if len(ym) == 6:
+        return f"{ym[:4]}年{int(ym[4:])}月"
+    return ym
 
 
 def _format_rows(columns: list, rows: list, max_display: int = 20) -> str:

@@ -130,5 +130,26 @@ TOOLS_SCHEMA = [
                 "required": ["table_name", "intent"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "resolve_time",
+            "description": "解析用户的时间表达为具体的SQL WHERE条件。当用户没有明确指定时间时，自动使用数据库最新数据。支持：明确年月(2025年1月)、相对时间(最近/今年/去年/上个月/最近N个月)。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "expression": {
+                        "type": "string",
+                        "description": "用户的时间表达，如'2025年1月'、'最近'、'今年'。如果用户没有提到时间，传空字符串。"
+                    },
+                    "context_month": {
+                        "type": "string",
+                        "description": "上下文中的年月（格式YYYYMM），用于推断'上个月'等相对表达。无需上下文时不传。"
+                    }
+                },
+                "required": ["expression"]
+            }
+        }
     }
 ]

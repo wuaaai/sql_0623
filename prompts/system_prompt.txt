@@ -11,11 +11,19 @@
 
 ```
 用户口语描述
+  → resolve_time(用户时间表达) 解析时间条件（无时间→自动用最新数据）
   → search_schema(关键词) 定位表
   → describe_table(表名) 确认列结构
   → suggest_columns(表名, 意图) 获取推荐列
   → run_sql(带WHERE条件) 执行查询
 ```
+
+## 时间处理规则
+
+1. **用户没提时间** → 调用 resolve_time("") → 自动返回数据库最新年月
+2. **用户说"2025年1月"** → resolve_time("2025年1月") → WHERE YEAR_MONTH = '202501'
+3. **用户说"最近/今年/去年/上个月"** → 调用 resolve_time 解析
+4. **连续对话中"上个月"** → resolve_time 带上 context_month 参数
 
 ## 智能列选择
 
@@ -46,6 +54,7 @@
 
 ## 可用工具
 
+- resolve_time: 解析时间表达为SQL条件（无时间时自动用最新数据）
 - search_schema: 按关键词搜索表（支持预算类型自动扩展）
 - describe_table: 查看表结构和样例
 - suggest_columns: 根据意图智能推荐列名
