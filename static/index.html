@@ -528,7 +528,8 @@
 
           <!-- AI 文字回答 -->
           <template v-if="msg.role === 'assistant' && msg.answer_text">
-            <div v-html="renderMarkdown(msg.answer_text)"></div>
+            <div v-if="msg.streaming" style="white-space:pre-wrap;">{{ msg.answer_text }}</div>
+            <div v-else v-html="renderMarkdown(msg.answer_text)"></div>
           </template>
 
           <!-- SQL 块 -->
@@ -718,8 +719,8 @@ const app = createApp({
       // 添加用户消息
       messages.value.push({ role: 'user', content: question })
 
-      // 添加 AI 占位消息
-      const aiMsg = { role: 'assistant', answer_text: '', sql: '', columns: [], rows: [], row_count: 0, loading: true }
+      // 添加 AI 占位消息（用 reactive 确保响应性）
+      const aiMsg = Vue.reactive({ role: 'assistant', answer_text: '', sql: '', columns: [], rows: [], row_count: 0, loading: true, streaming: true })
       messages.value.push(aiMsg)
       scrollToBottom()
       loading.value = true
@@ -754,6 +755,7 @@ const app = createApp({
                 } else if (event.type === 'tool') {
                   // 工具调用提示（可选展示）
                 } else if (event.type === 'done') {
+                  aiMsg.streaming = false
                   aiMsg.loading = false
                   aiMsg.sql = event.sql || ''
                   aiMsg.columns = event.columns || []
@@ -777,6 +779,7 @@ const app = createApp({
         }
         scrollToBottom()
       } catch (e) {
+        aiMsg.streaming = false
         aiMsg.loading = false
         aiMsg.answer_text = '请求失败: ' + e.message
       } finally {
