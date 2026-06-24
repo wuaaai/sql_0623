@@ -225,6 +225,13 @@ def chat(req: ChatRequest):
     ):
         full_answer += chunk
 
+    # 保存成功的最终查询模式
+    if handler.captured_sql:
+        try:
+            pattern_store.save_pattern(req.question, handler.captured_sql)
+        except Exception:
+            pass
+
     # 自动保存查询历史
     _append_history(req.question, handler.captured_sql or "")
 
@@ -307,6 +314,13 @@ async def chat_stream(req: ChatRequest):
 
         # 自动保存查询历史
         _append_history(req.question, handler.captured_sql or "")
+
+        # 保存成功的最终查询模式
+        if handler.captured_sql:
+            try:
+                pattern_store.save_pattern(req.question, handler.captured_sql)
+            except Exception:
+                pass
 
         # 发送最终结果
         result = {
