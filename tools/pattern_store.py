@@ -196,6 +196,8 @@ def search_patterns(keyword: str, budget_type: str = "", limit: int = 3) -> dict
 
         if score > 0:
             similarity = min(round(score), 95)
+            p["similarity"] = similarity
+            p["score"] = score
             scored.append({"pattern": p, "score": score, "similarity": similarity})
 
     # 排序取Top N
