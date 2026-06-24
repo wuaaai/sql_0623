@@ -168,12 +168,15 @@ def chat(req: ChatRequest):
 
     handler = ServerHandler()
 
+    # 在用户消息前注入工具调用指令，防止 LLM 跳过工具直接编造
+    user_msg = f"[指令: 你必须调用工具获取真实数据后回答，禁止编造。]\n用户问题: {req.question}"
+
     # 收集 agent 输出
     full_answer = ""
     for chunk in agent_runner_loop(
         client=client,
         system_prompt=system_prompt,
-        user_input=req.question,
+        user_input=user_msg,
         handler=handler,
         tools_schema=TOOLS_SCHEMA,
         max_turns=20,
@@ -217,11 +220,13 @@ async def chat_stream(req: ChatRequest):
 
     handler = ServerHandler()
 
+    user_msg = f"[指令: 你必须调用工具获取真实数据后回答，禁止编造。]\n用户问题: {req.question}"
+
     async def generate():
         for chunk in agent_runner_loop(
             client=client,
             system_prompt=system_prompt,
-            user_input=req.question,
+            user_input=user_msg,
             handler=handler,
             tools_schema=TOOLS_SCHEMA,
             max_turns=20,
