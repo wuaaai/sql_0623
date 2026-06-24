@@ -147,6 +147,16 @@ class TextToSQLHandler(BaseHandler):
             amount_hint = ""
             if amount_cols:
                 amount_hint = f"\n金额列: {', '.join(amount_cols[:8])}"
+                # 采样RG_NAME判断数据粒度
+                try:
+                    from tools import db_query
+                    sample_rows = db_query.run_sql(f"SELECT DISTINCT RG_NAME FROM {result['table_name']} WHERE ROWNUM <= 6")
+                    regions = [r.get('RG_NAME','') for r in (sample_rows.get('rows') or [])]
+                    unique = len(set(regions))
+                    if unique <= 2:
+                        amount_hint += f"\n[粒度: 省级] 仅含{', '.join(regions[:3])}数据，无地市明细。不要尝试查市级。"
+                except Exception:
+                    pass
 
             return StepOutcome(
                 data=result,
