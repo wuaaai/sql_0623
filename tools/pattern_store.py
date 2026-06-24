@@ -62,12 +62,16 @@ def save_pattern(question: str, sql: str) -> dict:
     budget_type = _extract_budget_type(question)
     table = _extract_table(sql)
 
-    # 检查重复（相同SQL）
+    # 检查重复：相同SQL 或 相同问题
     sql_clean = sql.replace(" ", "").upper()
     for p in patterns:
-        if p.get("sql", "").replace(" ", "").upper() == sql_clean:
+        same_sql = p.get("sql", "").replace(" ", "").upper() == sql_clean
+        same_question = p.get("question", "") == question
+        if same_sql or same_question:
             p["use_count"] = p.get("use_count", 1) + 1
             p["last_used"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+            if same_question and not same_sql:
+                p["sql"] = sql[:500]  # 更新SQL（可能略有不同）
             _save_patterns(patterns)
             return {"status": "ok", "merged": True, "pattern_id": p["id"]}
 
