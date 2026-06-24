@@ -189,5 +189,40 @@ TOOLS_SCHEMA = [
                 "required": ["table_name", "group_by", "aggregate"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "find_relations",
+            "description": "分析两张表之间的关系：发现公共列、建议关联方式（JOIN或UNION）。当用户问'这两张表怎么关联'或需要跨表查询前使用。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "table_a": {"type": "string", "description": "第一张表名"},
+                    "table_b": {"type": "string", "description": "第二张表名"}
+                },
+                "required": ["table_a", "table_b"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "union_query",
+            "description": "对多张同构表（结构相同的表）执行UNION ALL合并后聚合查询。用于跨预算类型合并排名、汇总。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "tables": {"type": "string", "description": "逗号分隔的表名列表"},
+                    "select_cols": {"type": "string", "description": "SELECT的列名"},
+                    "group_by": {"type": "string", "description": "分组列名"},
+                    "aggregate": {"type": "string", "description": "聚合表达式，如SUM(BYS_JE)"},
+                    "filters": {"type": "string", "description": "WHERE条件(可选)"},
+                    "order": {"type": "string", "enum": ["DESC", "ASC"], "description": "排序方向"},
+                    "limit": {"type": "integer", "description": "返回行数，默认20"}
+                },
+                "required": ["tables", "select_cols", "group_by", "aggregate"]
+            }
+        }
     }
 ]

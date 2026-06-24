@@ -8,7 +8,7 @@ dispatch(tool_name, args) → do_<tool_name>(args) → StepOutcome
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from tools import db_connection, db_query, db_schema, time_resolver, db_aggregation
+from tools import db_connection, db_query, db_schema, time_resolver, db_aggregation, db_cross_table
 
 
 @dataclass
@@ -266,6 +266,57 @@ class TextToSQLHandler(BaseHandler):
                 data=result,
                 next_prompt=f"聚合查询失败: {result['message']}\n"
                             f"请检查表名、分组列、聚合表达式是否正确，先用 describe_table 确认。"
+            )
+
+    def do_find_relations(self, args: dict) -> StepOutcome:
+        result = db_cross_table.find_relations(args["table_a"], args["table_b"])
+
+        if result["status"] == "success":
+            msg = f"表关系分析: {result['table_a']} ↔ {result['table_b']}\n"
+            msg += f"关系类型: {result['relation']}\n"
+            msg += f"公共列数: {result['common_count']} / 重叠度: {result['overlap_ratio']}\n"
+
+            if result.get("join_keys"):
+                keys = [k["name"] for k in result["join_keys"]]
+                msg += f"关联键: {', '.join(keys)}\n"
+                if result.get("join_sql_template"):
+                    msg += f"JOIN模板: {result['join_sql_template']}\n"
+
+            return StepOutcome(
+                data=result,
+                next_prompt=msg + "\n根据以上分析，向用户说明两表的关联方式和建议的查询方法。"
+            )
+        else:
+            return StepOutcome(
+                data=result,
+                next_prompt=f"分析失败: {result['message']}"
+            )
+
+    def do_union_query(self, args: dict) -> StepOutcome:
+        result = db_cross_table.union_query(
+            tables=args["tables"],
+            select_cols=args["select_cols"],
+            group_by=args["group_by"],
+            aggregate=args["aggregate"],
+            filters=args.get("filters", ""),
+            order=args.get("order", "DESC"),
+            limit=args.get("limit", 20)
+        )
+
+        if result["status"] == "success":
+            rows_display = _format_rows(result["columns"], result["rows"])
+            return StepOutcome(
+                data=result,
+                next_prompt=f"跨表合并查询成功，合并 {result['table_count']} 张表，返回 {result['row_count']} 行。\n"
+                            f"SQL: {result.get('sql', '')[:300]}\n"
+                            f"数据:\n{rows_display}\n"
+                            f"请用自然语言向用户解释合并后的结果。"
+            )
+        else:
+            return StepOutcome(
+                data=result,
+                next_prompt=f"合并查询失败: {result['message']}\n"
+                            f"请先用 find_relations 确认表结构是否适合合并。"
             )
 
 

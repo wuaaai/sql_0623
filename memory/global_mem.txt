@@ -42,6 +42,26 @@
 - "合    计" / "合计" / "一、收入合计"
 - "一、税收收入" / "二、非税收入"
 
+## 跨表关联知识
+
+### 四类预算表同构
+- 一般公共预算(YBGGYS)/社保(SHBXJJ)/国资(GYZBJY)/政府性基金(ZFXJJ)的收入表结构相同
+- 支出表也结构相同
+- 共享18+公共列: RG_CODE, RG_NAME, YEAR_MONTH, DEPT_CODE, DEPT_NAME, XM_CODE, XM_NAME 等
+- 可直接 UNION ALL 合并后统一聚合排名
+
+### 字典表关联键
+- RDYS_BAS_EXPFUNC(支出分类): EXP_FUNC_CODE → 执行表
+- RDYS_BAS_MOFDIV(地区划分): MOF_DIV_CODE → 执行表
+- RDYS_BAS_INCOMESORT(收入分类): INCOMESORT_CODE → 执行表
+- 使用 find_relations 工具发现两表的关联键
+
+### 跨表查询策略
+- 对比 → 分别查两张表 + LLM综合
+- 合并排名 → union_query 或 run_sql(UNION ALL)
+- 字典关联 → find_relations → run_sql(JOIN)
+
+
 ## 排名查询
 - 一般公共预算有排名表 RDYS_LD_YSZX_YBGGYS_SZPMQK（全国各省排名，非省内各市）
 - 查"各市排名"直接用预算表: SELECT RG_NAME, BYS_JE FROM table WHERE ... ORDER BY BYS_JE DESC

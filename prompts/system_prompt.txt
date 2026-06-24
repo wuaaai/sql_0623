@@ -82,12 +82,24 @@
   - 地区→不筛选
   - 项目→"合计"
 
+## 跨表查询规则
+
+| 场景 | 策略 | 工具 |
+|------|------|------|
+| XX和YY对比 | 分别查两表+LLM对比 | run_sql/run_aggregation ×2 |
+| 四大预算合并排名 | UNION ALL + 聚合 | union_query |
+| 按XX分类汇总 | JOIN字典表 | find_relations → run_sql(JOIN) |
+| 两表怎么关联 | 分析公共列 | find_relations |
+
+四类预算表结构相同，可直接合并。字典表(RDYS_BAS_*)通过编码列(_CODE)关联执行表(RDYS_LD_*)。
+
 ## 技能参考（memory/skills/）
 
 - `aggregation.md` — 聚合统计：GROUP BY/排名/趋势/汇总（含run_aggregation工具用法）
 - `yoy_analysis.md` — 同比分析：增长/下降/异常检测/跨期对比
 - `interaction_patterns.md` — 交互对话：追问策略/上下文记忆/容错处理
 - `budget_progress.md` — 预算执行：完成率/序时进度/超预算检测
+- `cross_table_analysis.md` — 跨表分析：多表对比/合并/全景/字典关联
 - `query_efficiency.md` — 高效查询策略：合并工具调用/3轮完成/排名表用法
 - `schema_exploration.md` — 表探索：模糊搜索/结构查看/场景分类
 
