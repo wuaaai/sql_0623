@@ -17,9 +17,10 @@ load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
+import asyncio
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -187,6 +188,62 @@ def chat(req: ChatRequest):
         rows=handler.captured_rows,
         tool_calls=[]
     )
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(req: ChatRequest):
+    """流式输出 chat 响应（SSE）"""
+    if db_connection._connection is None:
+        raise HTTPException(status_code=400, detail="请先连接数据库")
+
+    client = _build_client()
+    system_prompt = _load_system_prompt()
+
+    # 注入连接上下文
+    conn = db_connection._conn_info or {}
+    system_prompt += (
+        f"\n\n[DB: dameng, schema={conn.get('schema', '')}, 已连接，勿调connect_db]"
+    )
+
+    # 注入全局记忆
+    mem_path = os.path.join(os.path.dirname(__file__), "memory", "global_mem.txt")
+    if os.path.exists(mem_path):
+        with open(mem_path, "r", encoding="utf-8") as f:
+            system_prompt += f"\n\n[参考]\n{f.read()[:800]}"
+
+    # 追问限制
+    if req.clarify_count >= 2:
+        system_prompt += "\n\n[强制] 已追问2次，必须直接查。时间→最新, 地区→全部, 项目→合计"
+
+    handler = ServerHandler()
+
+    async def generate():
+        for chunk in agent_runner_loop(
+            client=client,
+            system_prompt=system_prompt,
+            user_input=req.question,
+            handler=handler,
+            tools_schema=TOOLS_SCHEMA,
+            max_turns=20,
+            verbose=False
+        ):
+            # 检测工具调用标记（agent_loop 中 yield 的格式）
+            if chunk.startswith("🛠️"):
+                yield f"data: {json.dumps({'type': 'tool', 'text': chunk}, ensure_ascii=False)}\n\n"
+            elif chunk.strip():
+                yield f"data: {json.dumps({'type': 'text', 'text': chunk}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0)
+
+        # 发送最终结果
+        result = {
+            "type": "done",
+            "sql": handler.captured_sql,
+            "columns": handler.captured_columns,
+            "rows": handler.captured_rows
+        }
+        yield f"data: {json.dumps(result, ensure_ascii=False, default=str)}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 # ==== 静态文件 ====
