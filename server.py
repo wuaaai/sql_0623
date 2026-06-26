@@ -463,7 +463,7 @@ def main():
         print(f"[启动] 已自动连接数据库 {os.environ['DB_SCHEMA']}")
     except Exception as e:
         print(f"[启动] 数据库自动连接失败: {e}")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)
 
 
 if __name__ == "__main__":
