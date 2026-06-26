@@ -490,8 +490,7 @@
 
           <!-- AI 文字回答 -->
           <template v-if="msg.role === 'assistant' && msg.answer_text">
-            <div v-if="msg.loading" style="white-space:pre-wrap;">{{ msg.answer_text }}</div>
-            <div v-else v-html="renderMarkdown(msg.answer_text)"></div>
+            <div v-html="renderMarkdown(msg.answer_text)"></div>
           </template>
 
           <!-- SQL 块 -->
@@ -770,32 +769,19 @@ const app = createApp({
 
     const renderMarkdown = (text) => {
       if (!text) return ''
-      if (typeof marked !== 'undefined') {
-        // 配置 marked + highlight.js
-        if (!marked._configured) {
-          marked.setOptions({
-            breaks: true,
-            gfm: true
-          })
-          if (typeof hljs !== 'undefined') {
-            marked.setOptions({
-              highlight: (code, lang) => {
-                if (lang && hljs.getLanguage(lang)) {
-                  return hljs.highlight(code, { language: lang }).value
-                }
-                return hljs.highlightAuto(code).value
-              }
-            })
+      try {
+        if (typeof marked !== 'undefined') {
+          if (!marked._configured) {
+            marked.setOptions({ breaks: true, gfm: true })
+            marked._configured = true
           }
-          marked._configured = true
+          return marked.parse(text)
         }
-        return marked.parse(text)
+      } catch (e) {
+        console.log('marked error:', e)
       }
-      // fallback: 基础渲染
-      return text
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')
+      // fallback
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>')
     }
 
     // 检查健康状态
