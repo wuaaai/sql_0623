@@ -15,9 +15,10 @@ import sys
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import UploadFile
 from pydantic import BaseModel
 from typing import Optional
 import asyncio
@@ -26,14 +27,16 @@ from datetime import datetime
 
 # 会话目录
 SESSIONS_DIR = os.path.join(os.path.dirname(__file__), "sessions")
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 os.makedirs(SESSIONS_DIR, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
 
 sys.path.insert(0, os.path.dirname(__file__))
 
 from openai import OpenAI
 from agent_loop import agent_runner_loop
 from tools.schema import TOOLS_SCHEMA
-from tools import db_connection, db_query, pattern_store, memory_core
+from tools import db_connection, db_query, pattern_store, memory_core, admin_db
 
 
 # ==== 请求/响应模型 ====
@@ -444,6 +447,97 @@ def session_list():
     return {"status": "ok", "history": _load_history()[:50]}
 
 
+
+# ==== 管理后台 API ====
+@app.get("/api/admin/tables")
+def admin_tables(search: str = "", budget_type: str = "", page: int = 1):
+    return admin_db.get_tables(search, budget_type, page)
+
+@app.get("/api/admin/tables/{table_name}")
+def admin_table_detail(table_name: str):
+    r = admin_db.get_table(table_name)
+    if not r: raise HTTPException(404, "表不存在")
+    return r
+
+@app.post("/api/admin/tables")
+async def admin_table_add(request: Request):
+    req = await request.json()
+    return admin_db.add_table(req.get("table_name",""), req.get("comment",""), req.get("budget_type",""))
+
+@app.put("/api/admin/tables/{table_name}")
+async def admin_table_update(table_name: str, request: Request):
+    req = await request.json()
+    return admin_db.update_table(table_name, req.get("comment"), req.get("budget_type"))
+
+@app.delete("/api/admin/tables/{table_name}")
+def admin_table_delete(table_name: str):
+    return admin_db.delete_table(table_name)
+
+@app.put("/api/admin/tables/{table_name}/toggle")
+def admin_table_toggle(table_name: str):
+    return admin_db.toggle_table(table_name)
+
+@app.post("/api/admin/tables/{table_name}/sync")
+def admin_table_sync(table_name: str):
+    return admin_db.sync_table(table_name)
+
+@app.get("/api/admin/tables/{table_name}/regions")
+def admin_table_regions_get(table_name: str):
+    return admin_db.get_table_regions(table_name)
+
+@app.put("/api/admin/tables/{table_name}/regions")
+async def admin_table_regions_set(table_name: str, request: Request):
+    req = await request.json()
+    return admin_db.set_table_regions(table_name, req.get("regions", []))
+
+@app.get("/api/admin/documents")
+def admin_docs(search: str = "", page: int = 1):
+    return admin_db.get_documents(search, page)
+
+@app.post("/api/admin/documents")
+async def admin_doc_upload(file: UploadFile = None, regions: str = "[]"):
+    if not file: raise HTTPException(400, "请上传文件")
+    path = os.path.join(DATA_DIR, file.filename)
+    with open(path, "wb") as f:
+        f.write(await file.read())
+    admin_db.add_document(file.filename, path)
+    return {"status": "ok", "source": file.filename}
+
+@app.delete("/api/admin/documents/{source}")
+def admin_doc_delete(source: str):
+    return admin_db.delete_document(source)
+
+@app.put("/api/admin/documents/{source}/toggle")
+def admin_doc_toggle(source: str):
+    return admin_db.toggle_document(source)
+
+@app.get("/api/admin/documents/{source}/regions")
+def admin_doc_regions_get(source: str):
+    return admin_db.get_doc_regions(source)
+
+@app.put("/api/admin/documents/{source}/regions")
+async def admin_doc_regions_set(source: str, request: Request):
+    req = await request.json()
+    return admin_db.set_doc_regions(source, req.get("regions", []))
+
+@app.get("/api/admin/overview")
+def admin_overview(region_code: str = ""):
+    return admin_db.get_overview(region_code)
+
+@app.get("/api/admin/regions/tree")
+def admin_regions_tree():
+    with open(os.path.join(DATA_DIR, "region_tree.json"), encoding="utf-8") as f:
+        return json.load(f)
+
+@app.get("/api/admin/logs")
+def admin_logs(page: int = 1):
+    return admin_db.get_logs(page)
+
+@app.get("/admin")
+def admin_page():
+    return FileResponse(os.path.join(static_dir, "admin.html"))
+
+
 # ==== 静态文件 ====
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -462,6 +556,8 @@ def index():
 
 def main():
     import uvicorn
+    # 初始化管理数据库
+    admin_db.init_db()
     # 启动时自动连接数据库
     try:
         db_connection.connect_db(
