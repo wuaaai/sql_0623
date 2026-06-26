@@ -681,7 +681,7 @@ const app = createApp({
       messages.value.push({ role: 'user', content: question })
 
       // 添加 AI 占位消息（用 reactive 确保响应性）
-      const aiMsg = Vue.reactive({ role: 'assistant', answer_text: '', _html: '', sql: '', columns: [], rows: [], row_count: 0, loading: true, streaming: true })
+      const aiMsg = { role: 'assistant', answer_text: '', _html: '', sql: '', columns: [], rows: [], row_count: 0, loading: true, streaming: true }
       messages.value.push(aiMsg)
       scrollToBottom()
       loading.value = true
@@ -727,14 +727,15 @@ const app = createApp({
           scrollToBottom()
         }
 
-        // 流结束，处理缓冲区剩余数据，延迟确保文本完整再渲染markdown
+        // 流结束，处理缓冲区剩余数据并最终渲染markdown
         if (buffer.trim() && buffer.trim().startsWith('data: ')) {
           try {
             const event = JSON.parse(buffer.trim().slice(6))
             if (event.type === 'text') aiMsg.answer_text += event.text
           } catch (e) {}
         }
-        await new Promise(r => setTimeout(r, 200))
+        // 最终渲染 markdown
+        aiMsg._html = renderMarkdown(aiMsg.answer_text)
         aiMsg.loading = false
         await nextTick()
 
