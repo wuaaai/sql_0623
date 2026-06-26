@@ -61,8 +61,14 @@ class TextToSQLHandler(BaseHandler):
         result = db_connection.list_tables()
 
         if result["status"] == "success":
-            tables = result["tables"]
-            total = result["table_count"]
+            # 过滤禁用的表
+            all_tables = result["tables"]
+            disabled = admin_db._conn().execute(
+                "SELECT table_name FROM table_metadata WHERE is_enabled=0"
+            ).fetchall()
+            disabled_names = {r[0] for r in disabled}
+            tables = [t for t in all_tables if t not in disabled_names]
+            total = len(tables)
             # 只给LLM看前20个表名，避免它自作主张"整理分类"
             preview = tables[:20]
             tables_str = ", ".join(preview)
@@ -134,7 +140,15 @@ class TextToSQLHandler(BaseHandler):
             )
 
     def do_describe_table(self, args: dict) -> StepOutcome:
-        result = db_schema.describe_table(args["table_name"])
+        table_name = args["table_name"]
+        # 检查表是否被禁用
+        allowed, msg = admin_db.check_table_permission(f"SELECT * FROM {table_name}")
+        if not allowed:
+            return StepOutcome(
+                {"status": "error", "message": msg},
+                next_prompt=f"表 {table_name} 已被管理员禁用，不要尝试查询或描述此表。请告知用户此表暂不可用，建议查询其他表。"
+            )
+        result = db_schema.describe_table(table_name)
 
         if result["status"] == "success":
             cols_desc_lines = []
