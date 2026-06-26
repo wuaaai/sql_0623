@@ -7,175 +7,197 @@
 <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family: "PingFang SC","Microsoft YaHei",sans-serif;background:#f5f7fa;display:flex;height:100vh}
-.sidebar{width:220px;background:#304156;color:#bfcbd9;display:flex;flex-direction:column}
-.sidebar h2{padding:20px;font-size:16px;color:#fff;border-bottom:1px solid #3a4f66}
-.nav-item{padding:14px 20px;cursor:pointer;font-size:14px;transition:all .2s}
-.nav-item:hover,.nav-item.active{background:#263445;color:#409eff}
-.main{flex:1;overflow-y:auto;padding:24px}
-.header{font-size:20px;font-weight:600;margin-bottom:20px;color:#303133}
-.toolbar{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
-.toolbar .el-input{width:240px}
-.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
-.doc-card{background:#fff;border-radius:8px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-.doc-card h4{margin-bottom:8px;color:#303133}
-.doc-card p{font-size:13px;color:#909399;margin:4px 0}
-.doc-card .actions{margin-top:12px;display:flex;gap:8px}
+body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#f0f2f5;display:flex;height:100vh}
+.sidebar{width:220px;background:#304156;color:#bfcbd9;display:flex;flex-direction:column;flex-shrink:0}
+.sidebar h2{padding:20px;font-size:16px;color:#fff;border-bottom:1px solid #3a4f66;margin:0}
+.nav-item{padding:14px 20px;cursor:pointer;font-size:14px;border-left:3px solid transparent;transition:all .2s}
+.nav-item:hover{background:#263445}
+.nav-item.active{background:#263445;color:#409eff;border-left-color:#409eff}
+.nav-back{margin-top:auto;border-top:1px solid #3a4f66;color:#909399}
+.main{flex:1;overflow-y:auto;padding:24px;min-width:0}
+.header{font-size:18px;font-weight:600;margin-bottom:20px;color:#303133}
+.toolbar{display:flex;gap:12px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+.toolbar>*{flex-shrink:0}
+.spacer{flex:1}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.doc-card{background:#fff;border-radius:8px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.doc-card h4{font-size:15px;color:#303133;margin-bottom:10px;word-break:break-all}
+.doc-card .meta{font-size:13px;color:#909399;margin:6px 0;display:flex;justify-content:space-between}
+.doc-card .card-actions{margin-top:14px;display:flex;gap:8px;align-items:center}
+.region-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;min-height:28px}
+.region-row{display:flex;gap:8px;margin-bottom:8px}
 </style>
 </head>
 <body>
 
 <div id="app">
-<div class="sidebar">
-  <h2>预算Agent 管理</h2>
-  <div class="nav-item" :class="{active:page==='tables'}" @click="page='tables'">数据表管理</div>
-  <div class="nav-item" :class="{active:page==='docs'}" @click="page='docs'">文档管理</div>
-  <div class="nav-item" :class="{active:page==='overview'}" @click="page='overview'">权限总览</div>
-  <div class="nav-item" :class="{active:page==='logs'}" @click="page='logs'">操作日志</div>
-  <div class="nav-item" style="margin-top:auto;border-top:1px solid #3a4f66" @click="goChat">← 返回聊天</div>
-</div>
+  <div class="sidebar">
+    <h2>预算Agent 管理</h2>
+    <div class="nav-item" :class="{active:page==='tables'}" @click="page='tables'">数据表管理</div>
+    <div class="nav-item" :class="{active:page==='docs'}" @click="page='docs'">文档管理</div>
+    <div class="nav-item" :class="{active:page==='overview'}" @click="page='overview'">权限总览</div>
+    <div class="nav-item" :class="{active:page==='logs'}" @click="page='logs'">操作日志</div>
+    <div class="nav-item nav-back" @click="goChat">← 返回聊天</div>
+  </div>
 
-<div class="main">
-  <!-- 表管理 -->
-  <template v-if="page==='tables'">
-    <div class="header">数据表管理</div>
-    <div class="toolbar">
-      <el-input v-model="tSearch" placeholder="搜索表名或注释" clearable @input="loadTables"/>
-      <el-select v-model="tBudget" placeholder="预算类型" clearable @change="loadTables" style="width:160px">
-        <el-option v-for="b in budgetTypes" :key="b" :label="b" :value="b"/>
-      </el-select>
-      <el-button type="primary" @click="showAddTable=true">新增表</el-button>
-      <el-button @click="loadTables">刷新</el-button>
-    </div>
-    <el-table :data="tables" stripe>
-      <el-table-column prop="table_name" label="表名" min-width="200">
-        <template #default="{row}">
-          <el-button link type="primary" @click="viewTable(row)">{{row.table_name}}</el-button>
-        </template>
-      </el-table-column>
-      <el-table-column prop="comment" label="注释" min-width="150"/>
-      <el-table-column prop="budget_type" label="类型" width="120"/>
-      <el-table-column prop="column_count" label="列数" width="70"/>
-      <el-table-column label="权限" width="80">
-        <template #default="{row}">
-          <el-button link @click="editRegions('table',row.table_name)">{{row.region_count||0}}个</el-button>
-        </template>
-      </el-table-column>
-      <el-table-column label="状态" width="80">
-        <template #default="{row}">
-          <el-switch :model-value="!!row.is_enabled" @change="toggleTable(row)"/>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="200">
-        <template #default="{row}">
-          <el-button link type="primary" @click="editTable(row)">编辑</el-button>
-          <el-button link type="warning" @click="syncTable(row)">同步</el-button>
-          <el-button link type="danger" @click="delTable(row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <el-pagination v-if="tTotal>20" layout="prev,pager,next" :total="tTotal" :page-size="20" @current-change="p=>loadTables(p)"/>
-  </template>
+  <div class="main">
 
-  <!-- 文档管理 -->
-  <template v-if="page==='docs'">
-    <div class="header">文档管理</div>
-    <div class="toolbar">
-      <el-input v-model="dSearch" placeholder="搜索文件名" clearable @input="loadDocs"/>
-      <el-button type="primary" @click="showUpload=true">上传文档</el-button>
-      <el-button @click="loadDocs">刷新</el-button>
-    </div>
-    <div class="card-grid">
-      <div class="doc-card" v-for="d in docs" :key="d.source">
-        <h4>{{d.source}}</h4>
-        <p>向量: {{d.chunk_count}}条 | 权限: {{d.region_count||0}}个 | 状态: {{d.is_enabled?'已启用':'已禁用'}}</p>
-        <div class="actions">
-          <el-button size="small" @click="editRegions('doc',d.source)">权限</el-button>
-          <el-switch size="small" :model-value="!!d.is_enabled" @change="toggleDoc(d)"/>
-          <el-button size="small" type="danger" @click="delDoc(d)">删除</el-button>
-        </div>
+    <!-- ========== 数据表管理 ========== -->
+    <template v-if="page==='tables'">
+      <div class="header">数据表管理</div>
+      <div class="toolbar">
+        <el-input v-model="tSearch" placeholder="搜索表名或注释" clearable @input="loadTables" style="width:240px"/>
+        <el-select v-model="tBudget" placeholder="全部类型" clearable @change="loadTables" style="width:150px">
+          <el-option v-for="b in budgetTypes" :key="b" :label="b" :value="b"/>
+        </el-select>
+        <div class="spacer"></div>
+        <el-button type="primary" @click="showAddTable=true">新增表</el-button>
+        <el-button @click="loadTables">刷新</el-button>
       </div>
+      <el-table :data="tables" stripe v-loading="tLoading" empty-text="暂无数据">
+        <el-table-column prop="table_name" label="表名" min-width="220">
+          <template #default="{row}">
+            <el-button link type="primary" @click="viewTable(row)">{{row.table_name}}</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column prop="comment" label="注释" min-width="160"/>
+        <el-table-column prop="budget_type" label="预算类型" width="110"/>
+        <el-table-column prop="column_count" label="列数" width="60"/>
+        <el-table-column label="地区权限" width="80">
+          <template #default="{row}">
+            <el-button link @click="editRegions('table',row.table_name)">{{row.region_count||0}}个</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="70">
+          <template #default="{row}">
+            <el-switch :model-value="!!row.is_enabled" size="small" @change="toggleTable(row)"/>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="160">
+          <template #default="{row}">
+            <el-button link type="primary" size="small" @click="editTable(row)">编辑</el-button>
+            <el-button link type="warning" size="small" @click="syncTable(row)">同步</el-button>
+            <el-button link type="danger" size="small" @click="delTable(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div style="text-align:center;margin-top:12px">
+        <el-pagination small background layout="prev,next" :total="tTotal" :page-size="20" @current-change="p=>loadTables(p)"/>
+      </div>
+    </template>
+
+    <!-- ========== 文档管理 ========== -->
+    <template v-if="page==='docs'">
+      <div class="header">文档管理</div>
+      <div class="toolbar">
+        <el-input v-model="dSearch" placeholder="搜索文件名" clearable @input="loadDocs" style="width:240px"/>
+        <div class="spacer"></div>
+        <el-button type="primary" @click="showUpload=true">上传文档</el-button>
+        <el-button @click="loadDocs">刷新</el-button>
+      </div>
+      <div class="card-grid" v-loading="dLoading">
+        <div class="doc-card" v-for="d in docs" :key="d.source">
+          <h4>{{d.source}}</h4>
+          <div class="meta"><span>向量片段: {{d.chunk_count}}条</span><span>地区: {{d.region_count||0}}个</span></div>
+          <div class="meta"><span>状态: {{d.is_enabled?'已启用':'已禁用'}}</span></div>
+          <div class="card-actions">
+            <el-button size="small" @click="editRegions('doc',d.source)">地区权限</el-button>
+            <el-switch :model-value="!!d.is_enabled" size="small" @change="toggleDoc(d)"/>
+            <div class="spacer"></div>
+            <el-button size="small" type="danger" @click="delDoc(d)">删除</el-button>
+          </div>
+        </div>
+        <div v-if="docs.length===0" style="grid-column:1/-1;text-align:center;padding:60px;color:#909399">暂无文档</div>
+      </div>
+    </template>
+
+    <!-- ========== 权限总览 ========== -->
+    <template v-if="page==='overview'">
+      <div class="header">权限总览</div>
+      <div class="toolbar">
+        <el-cascader v-model="ovRegion" :options="regionTree" :props="{value:'code',label:'name',emitPath:false,checkStrictly:true}" placeholder="选择地区查看权限" @change="loadOverview" style="width:300px"/>
+      </div>
+      <template v-if="ovData">
+        <h4 style="margin:20px 0 10px;color:#303133">可访问的数据表 ({{ovData.tables?.length||0}}/{{ovData.total_tables}})</h4>
+        <el-table :data="ovData.tables||[]" stripe max-height="280">
+          <el-table-column prop="table_name" label="表名"/><el-table-column prop="comment" label="注释"/>
+        </el-table>
+        <h4 style="margin:20px 0 10px;color:#303133">可访问的文档 ({{ovData.documents?.length||0}}/{{ovData.total_docs}})</h4>
+        <el-table :data="ovData.documents||[]" stripe max-height="200">
+          <el-table-column prop="source" label="文件名"/><el-table-column prop="chunk_count" label="向量数"/>
+        </el-table>
+      </template>
+      <div v-else style="text-align:center;padding:80px;color:#909399">请选择地区查看权限覆盖情况</div>
+    </template>
+
+    <!-- ========== 操作日志 ========== -->
+    <template v-if="page==='logs'">
+      <div class="header">操作日志</div>
+      <el-table :data="logs" stripe empty-text="暂无日志">
+        <el-table-column prop="created_at" label="时间" width="160"/>
+        <el-table-column prop="action" label="操作" width="90"/>
+        <el-table-column prop="target_type" label="类型" width="70"/>
+        <el-table-column prop="target_name" label="目标" min-width="200"/>
+        <el-table-column prop="detail" label="详情" min-width="180"/>
+      </el-table>
+      <div style="text-align:center;margin-top:12px">
+        <el-pagination small background layout="prev,next" :total="logTotal" :page-size="50" @current-change="p=>loadLogs(p)"/>
+      </div>
+    </template>
+
+  </div>
+
+  <!-- 新增表对话框 -->
+  <el-dialog v-model="showAddTable" title="新增数据表" width="420px">
+    <el-form label-width="80px">
+      <el-form-item label="表名"><el-input v-model="addForm.name" placeholder="达梦中的实际表名"/></el-form-item>
+      <el-form-item label="注释"><el-input v-model="addForm.comment" placeholder="可选"/></el-form-item>
+    </el-form>
+    <template #footer><el-button @click="showAddTable=false">取消</el-button><el-button type="primary" @click="doAddTable" :loading="adding">确认添加</el-button></template>
+  </el-dialog>
+
+  <!-- 编辑表对话框 -->
+  <el-dialog v-model="showEditTable" title="编辑表信息" width="420px">
+    <el-form label-width="80px">
+      <el-form-item label="表名"><el-input :model-value="editForm.table_name" disabled/></el-form-item>
+      <el-form-item label="注释"><el-input v-model="editForm.comment"/></el-form-item>
+      <el-form-item label="预算类型">
+        <el-select v-model="editForm.budget_type" style="width:100%">
+          <el-option v-for="b in budgetTypes" :key="b" :label="b" :value="b"/>
+        </el-select>
+      </el-form-item>
+    </el-form>
+    <template #footer><el-button @click="showEditTable=false">取消</el-button><el-button type="primary" @click="doEditTable">保存</el-button></template>
+  </el-dialog>
+
+  <!-- 地区权限对话框 -->
+  <el-dialog v-model="showRegions" :title="'地区权限 - '+regionTarget" width="500px">
+    <div class="region-tags">
+      <el-tag v-for="r in currentRegions" :key="r" closable @close="removeRegion(r)" type="info">{{regionLabel(r)}}</el-tag>
+      <span v-if="currentRegions.length===0" style="color:#909399;font-size:13px">未设置权限（全部地区可访问）</span>
     </div>
-  </template>
-
-  <!-- 权限总览 -->
-  <template v-if="page==='overview'">
-    <div class="header">权限总览</div>
-    <div class="toolbar">
-      <el-cascader v-model="ovRegion" :options="regionTree" :props="{value:'code',label:'name',emitPath:false,checkStrictly:true}" placeholder="选择地区" @change="loadOverview" style="width:300px"/>
+    <div class="region-row">
+      <el-cascader v-model="newRegion" :options="regionTree" :props="{value:'code',label:'name',emitPath:false,checkStrictly:true}" placeholder="选择地区" style="flex:1"/>
+      <el-button @click="addRegion">添加</el-button>
     </div>
-    <h4 v-if="ovData" style="margin:16px 0 8px">可访问的表 ({{ovData.tables?.length||0}}/{{ovData.total_tables}})</h4>
-    <el-table v-if="ovData" :data="ovData.tables||[]" stripe max-height="300">
-      <el-table-column prop="table_name" label="表名"/><el-table-column prop="comment" label="注释"/><el-table-column prop="budget_type" label="类型"/>
-    </el-table>
-    <h4 v-if="ovData" style="margin:16px 0 8px">可访问的文档 ({{ovData.documents?.length||0}}/{{ovData.total_docs}})</h4>
-    <el-table v-if="ovData" :data="ovData.documents||[]" stripe max-height="300">
-      <el-table-column prop="source" label="文件名"/><el-table-column prop="chunk_count" label="向量数"/>
-    </el-table>
-  </template>
+    <div style="margin-top:10px">
+      <el-button size="small" @click="setAllRegions">设为全省可见</el-button>
+      <el-button size="small" type="danger" @click="clearRegions">清空所有权限</el-button>
+    </div>
+    <template #footer><el-button @click="showRegions=false">取消</el-button><el-button type="primary" @click="saveRegions">保存</el-button></template>
+  </el-dialog>
 
-  <!-- 日志 -->
-  <template v-if="page==='logs'">
-    <div class="header">操作日志</div>
-    <el-table :data="logs" stripe>
-      <el-table-column prop="created_at" label="时间" width="160"/>
-      <el-table-column prop="action" label="操作" width="100"/>
-      <el-table-column prop="target_type" label="类型" width="80"/>
-      <el-table-column prop="target_name" label="目标" min-width="200"/>
-      <el-table-column prop="detail" label="详情" min-width="200"/>
-    </el-table>
-    <el-pagination layout="prev,next" :total="logTotal" :page-size="50" @current-change="p=>loadLogs(p)"/>
-  </template>
-</div>
-</div>
+  <!-- 上传文档对话框 -->
+  <el-dialog v-model="showUpload" title="上传文档" width="420px">
+    <el-upload drag :auto-upload="false" :on-change="onFileChange" accept=".docx" :limit="1">
+      <el-icon style="font-size:40px;color:#c0c4cc"><UploadFilled/></el-icon>
+      <div style="color:#606266;margin-top:8px">拖拽文件或点击上传</div>
+      <div style="font-size:12px;color:#909399;margin-top:4px">仅支持 .docx 格式</div>
+    </el-upload>
+    <div v-if="uploadFile" style="margin-top:12px;font-size:13px;color:#409eff">已选择: {{uploadFile.name}} ({{(uploadFile.size/1024/1024).toFixed(1)}} MB)</div>
+    <template #footer><el-button @click="showUpload=false">取消</el-button><el-button type="primary" @click="doUpload" :loading="uploading">开始上传</el-button></template>
+  </el-dialog>
 
-<!-- 编辑表 -->
-<el-dialog v-model="showEditTable" title="编辑表信息" width="400px">
-  <el-form>
-    <el-form-item label="注释"><el-input v-model="editForm.comment"/></el-form-item>
-    <el-form-item label="预算类型">
-      <el-select v-model="editForm.budget_type" style="width:100%">
-        <el-option v-for="b in budgetTypes" :key="b" :label="b" :value="b"/>
-      </el-select>
-    </el-form-item>
-  </el-form>
-  <template #footer><el-button @click="showEditTable=false">取消</el-button><el-button type="primary" @click="doEditTable">保存</el-button></template>
-</el-dialog>
-
-<!-- 新增表 -->
-<el-dialog v-model="showAddTable" title="新增数据表" width="400px">
-  <el-form>
-    <el-form-item label="表名"><el-input v-model="addForm.name" placeholder="达梦中的实际表名"/></el-form-item>
-    <el-form-item label="注释"><el-input v-model="addForm.comment" placeholder="中文业务含义（可选）"/></el-form-item>
-  </el-form>
-  <template #footer><el-button @click="showAddTable=false">取消</el-button><el-button type="primary" @click="doAddTable" :loading="adding">确认添加</el-button></template>
-</el-dialog>
-
-<!-- 权限编辑 -->
-<el-dialog v-model="showRegions" :title="'权限: '+regionTarget" width="500px">
-  <div v-if="regionTarget" style="margin-bottom:12px">
-    <el-tag v-for="r in currentRegions" :key="r" closable @close="removeRegion(r)" style="margin:4px">{{regionLabel(r)}}</el-tag>
-  </div>
-  <div style="display:flex;gap:8px">
-    <el-cascader v-model="newRegion" :options="regionTree" :props="{value:'code',label:'name',emitPath:false,checkStrictly:true}" placeholder="选择地区" style="flex:1"/>
-    <el-button @click="addRegion">添加</el-button>
-  </div>
-  <div style="margin-top:8px">
-    <el-button size="small" @click="setAllRegions">设为全省可见</el-button>
-    <el-button size="small" type="danger" @click="clearRegions">清空所有权限</el-button>
-  </div>
-  <template #footer><el-button @click="showRegions=false">取消</el-button><el-button type="primary" @click="saveRegions">保存</el-button></template>
-</el-dialog>
-
-<!-- 上传文档 -->
-<el-dialog v-model="showUpload" title="上传文档" width="400px">
-  <el-upload drag :auto-upload="false" :on-change="onFileChange" accept=".docx">
-    <el-icon><UploadFilled/></el-icon>
-    <div>拖拽文件或点击上传</div>
-  </el-upload>
-  <div v-if="uploadFile" style="margin-top:8px;font-size:13px;color:#606266">已选择: {{uploadFile.name}} ({{(uploadFile.size/1024/1024).toFixed(1)}}MB)</div>
-  <template #footer><el-button @click="showUpload=false">取消</el-button><el-button type="primary" @click="doUpload">开始上传</el-button></template>
-</el-dialog>
 </div>
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
@@ -185,49 +207,55 @@ body{font-family: "PingFang SC","Microsoft YaHei",sans-serif;background:#f5f7fa;
 const {createApp,ref,onMounted}=Vue
 createApp({setup(){
   const page=ref('tables')
-  // 表管理
-  const tables=ref([]),tSearch=ref(''),tBudget=ref(''),tTotal=ref(0),showAddTable=ref(false),addForm=ref({name:'',comment:''}),adding=ref(false),showEditTable=ref(false),editForm=ref({table_name:'',comment:'',budget_type:''})
-  const budgetTypes=['一般公共预算','社会保险','国有资本','政府性基金','字典表','其他']
-  // 文档
-  const docs=ref([]),dSearch=ref(''),showUpload=ref(false),uploadFile=ref(null)
-  // 权限
+  const tables=ref([]),tSearch=ref(''),tBudget=ref(''),tTotal=ref(0),tLoading=ref(false)
+  const showAddTable=ref(false),addForm=ref({name:'',comment:''}),adding=ref(false)
+  const showEditTable=ref(false),editForm=ref({table_name:'',comment:'',budget_type:'其他'})
+  const docs=ref([]),dSearch=ref(''),dLoading=ref(false),showUpload=ref(false),uploadFile=ref(null),uploading=ref(false)
   const showRegions=ref(false),regionTarget=ref(''),regionType=ref(''),currentRegions=ref([]),newRegion=ref(null),regionTree=ref([])
-  // 总览
   const ovRegion=ref(null),ovData=ref(null)
-  // 日志
   const logs=ref([]),logTotal=ref(0)
+  const budgetTypes=['一般公共预算','社会保险','国有资本','政府性基金','字典表','其他']
+  const regionMap={130000000:'河北省',130100000:'石家庄',130200000:'唐山',130300000:'秦皇岛',130400000:'邯郸',130500000:'邢台',130600000:'保定',130700000:'张家口',130800000:'承德',130900000:'沧州',131000000:'廊坊',131100000:'衡水'}
 
   const api=(url,opt={})=>fetch(url,{headers:{'Content-Type':'application/json'},...opt}).then(r=>r.json())
 
-  const loadTables=async(p=1)=>{let r=await api(`/api/admin/tables?search=${tSearch.value}&budget_type=${tBudget.value}&page=${p}`);tables.value=r.tables;tTotal.value=r.total}
-  const viewTable=async(row)=>{let r=await api(`/api/admin/tables/${row.table_name}`);alert(JSON.stringify(r.columns_json||[],null,2))}
-  const doAddTable=async()=>{adding.value=true;await api('/api/admin/tables',{method:'POST',body:JSON.stringify(addForm.value)});adding.value=false;showAddTable.value=false;addForm.value={name:'',comment:''};loadTables();ElementPlus.ElMessage.success('表已添加')}
+  // 表管理
+  const loadTables=async(p=1)=>{tLoading.value=true;let r=await api(`/api/admin/tables?search=${tSearch.value}&budget_type=${tBudget.value}&page=${p}`);tables.value=r.tables;tTotal.value=r.total;tLoading.value=false}
+  const viewTable=(row)=>{let cols=[];try{cols=JSON.parse(row.columns_json||'[]')}catch(e){};let text=cols.map(c=>c.name+' ('+c.type+')').join('\n');ElementPlus.ElMessageBox.alert(text||'无列信息','列结构 - '+row.table_name,{confirmButtonText:'关闭'})}
+  const doAddTable=async()=>{if(!addForm.value.name)return;adding.value=true;await api('/api/admin/tables',{method:'POST',body:JSON.stringify(addForm.value)});adding.value=false;showAddTable.value=false;addForm.value={name:'',comment:''};loadTables();ElementPlus.ElMessage.success('表已添加')}
   const editTable=(row)=>{editForm.value={table_name:row.table_name,comment:row.comment||'',budget_type:row.budget_type||'其他'};showEditTable.value=true}
   const doEditTable=async()=>{await api(`/api/admin/tables/${editForm.value.table_name}`,{method:'PUT',body:JSON.stringify({comment:editForm.value.comment,budget_type:editForm.value.budget_type})});showEditTable.value=false;loadTables();ElementPlus.ElMessage.success('已更新')}
   const toggleTable=async(row)=>{await api(`/api/admin/tables/${row.table_name}/toggle`,{method:'PUT'});loadTables()}
   const syncTable=async(row)=>{await api(`/api/admin/tables/${row.table_name}/sync`,{method:'POST'});ElementPlus.ElMessage.success('同步完成');loadTables()}
-  const delTable=async(row)=>{if(confirm('确定要禁用此表？')){await api(`/api/admin/tables/${row.table_name}`,{method:'DELETE'});loadTables()}}
+  const delTable=async(row)=>{try{await ElementPlus.ElMessageBox.confirm('确定要禁用此表？用户将无法查询。','确认',{confirmButtonText:'确定',cancelButtonText:'取消',type:'warning'});await api(`/api/admin/tables/${row.table_name}`,{method:'DELETE'});loadTables()}catch(e){}}
 
-  const loadDocs=async(p=1)=>{let r=await api(`/api/admin/documents?search=${dSearch.value}&page=${p}`);docs.value=r.documents}
+  // 文档管理
+  const loadDocs=async(p=1)=>{dLoading.value=true;let r=await api(`/api/admin/documents?search=${dSearch.value}&page=${p}`);docs.value=r.documents;dLoading.value=false}
   const onFileChange=(file)=>{uploadFile.value=file.raw}
-  const doUpload=async()=>{if(!uploadFile.value)return;let fd=new FormData();fd.append('file',uploadFile.value);await fetch('/api/admin/documents',{method:'POST',body:fd});showUpload.value=false;uploadFile.value=null;loadDocs();ElementPlus.ElMessage.success('上传完成')}
+  const doUpload=async()=>{if(!uploadFile.value)return;uploading.value=true;let fd=new FormData();fd.append('file',uploadFile.value);await fetch('/api/admin/documents',{method:'POST',body:fd});uploading.value=false;showUpload.value=false;uploadFile.value=null;loadDocs();ElementPlus.ElMessage.success('上传完成')}
   const toggleDoc=async(d)=>{await api(`/api/admin/documents/${d.source}/toggle`,{method:'PUT'});loadDocs()}
-  const delDoc=async(d)=>{if(confirm('确定删除此文档？')){await api(`/api/admin/documents/${d.source}`,{method:'DELETE'});loadDocs()}}
+  const delDoc=async(d)=>{try{await ElementPlus.ElMessageBox.confirm('确定删除此文档？将从知识库移除所有向量片段。','确认删除',{confirmButtonText:'确定',cancelButtonText:'取消',type:'warning'});await api(`/api/admin/documents/${d.source}`,{method:'DELETE'});loadDocs()}catch(e){}}
 
+  // 权限管理
   const editRegions=async(type,target)=>{regionType.value=type;regionTarget.value=target;let r=type==='table'?await api(`/api/admin/tables/${target}/regions`):await api(`/api/admin/documents/${target}/regions`);currentRegions.value=r.regions||[];showRegions.value=true}
-  const addRegion=()=>{if(newRegion.value&&!currentRegions.value.includes(newRegion.value))currentRegions.value.push(newRegion.value);newRegion.value=null}
+  const addRegion=()=>{if(newRegion.value&&!currentRegions.value.includes(newRegion.value)){currentRegions.value.push(newRegion.value);newRegion.value=null}}
   const removeRegion=(r)=>{currentRegions.value=currentRegions.value.filter(x=>x!==r)}
   const setAllRegions=()=>{currentRegions.value=['130000000']}
   const clearRegions=()=>{currentRegions.value=[]}
-  const saveRegions=async()=>{let body=JSON.stringify({regions:currentRegions.value});if(regionType.value==='table')await api(`/api/admin/tables/${regionTarget.value}/regions`,{method:'PUT',body});else await api(`/api/admin/documents/${regionTarget.value}/regions`,{method:'PUT',body});showRegions.value=false;loadTables();loadDocs();ElementPlus.ElMessage.success('权限已保存')}
-  const regionLabel=(code)=>{let m={130000000:'河北省',130100000:'石家庄',130200000:'唐山',130300000:'秦皇岛',130400000:'邯郸',130500000:'邢台',130600000:'保定',130700000:'张家口',130800000:'承德',130900000:'沧州',131000000:'廊坊',131100000:'衡水'};return m[code]||code}
+  const saveRegions=async()=>{let body=JSON.stringify({regions:currentRegions.value});regionType.value==='table'?await api(`/api/admin/tables/${regionTarget.value}/regions`,{method:'PUT',body}):await api(`/api/admin/documents/${regionTarget.value}/regions`,{method:'PUT',body});showRegions.value=false;loadTables();loadDocs();ElementPlus.ElMessage.success('权限已保存')}
+  const regionLabel=(code)=>regionMap[code]||code
 
+  // 权限总览
   const loadOverview=async()=>{if(ovRegion.value)ovData.value=await api(`/api/admin/overview?region_code=${ovRegion.value}`)}
+
+  // 日志
   const loadLogs=async(p=1)=>{let r=await api(`/api/admin/logs?page=${p}`);logs.value=r.logs;logTotal.value=r.total}
+
   const goChat=()=>{location.href='/'}
 
-  onMounted(async()=>{regionTree.value=[await api('/api/admin/regions/tree')];loadTables();loadDocs();loadLogs()})
-  return{page,tables,tSearch,tBudget,tTotal,budgetTypes,showAddTable,addForm,adding,showEditTable,editForm,viewTable,doAddTable,editTable,doEditTable,toggleTable,syncTable,delTable,loadTables,docs,dSearch,showUpload,uploadFile,onFileChange,doUpload,toggleDoc,delDoc,loadDocs,showRegions,regionTarget,editRegions,currentRegions,newRegion,addRegion,removeRegion,setAllRegions,clearRegions,saveRegions,regionLabel,regionTree,ovRegion,ovData,loadOverview,logs,logTotal,loadLogs,goChat}
+  onMounted(async()=>{let tree=await api('/api/admin/regions/tree');regionTree.value=[tree];loadTables();loadDocs();loadLogs()})
+
+  return{page,tables,tSearch,tBudget,tTotal,tLoading,budgetTypes,showAddTable,addForm,adding,showEditTable,editForm,viewTable,doAddTable,editTable,doEditTable,toggleTable,syncTable,delTable,loadTables,docs,dSearch,dLoading,showUpload,uploadFile,uploading,onFileChange,doUpload,toggleDoc,delDoc,loadDocs,showRegions,regionTarget,editRegions,currentRegions,newRegion,addRegion,removeRegion,setAllRegions,clearRegions,saveRegions,regionLabel,regionTree,ovRegion,ovData,loadOverview,logs,logTotal,loadLogs,goChat}
 }}).use(ElementPlus).mount('#app')
 </script>
 </body>
