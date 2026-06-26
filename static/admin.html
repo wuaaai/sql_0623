@@ -66,8 +66,9 @@ body{font-family: "PingFang SC","Microsoft YaHei",sans-serif;background:#f5f7fa;
           <el-switch :model-value="!!row.is_enabled" @change="toggleTable(row)"/>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="150">
+      <el-table-column label="操作" width="200">
         <template #default="{row}">
+          <el-button link type="primary" @click="editTable(row)">编辑</el-button>
           <el-button link type="warning" @click="syncTable(row)">同步</el-button>
           <el-button link type="danger" @click="delTable(row)">删除</el-button>
         </template>
@@ -128,6 +129,19 @@ body{font-family: "PingFang SC","Microsoft YaHei",sans-serif;background:#f5f7fa;
 </div>
 </div>
 
+<!-- 编辑表 -->
+<el-dialog v-model="showEditTable" title="编辑表信息" width="400px">
+  <el-form>
+    <el-form-item label="注释"><el-input v-model="editForm.comment"/></el-form-item>
+    <el-form-item label="预算类型">
+      <el-select v-model="editForm.budget_type" style="width:100%">
+        <el-option v-for="b in budgetTypes" :key="b" :label="b" :value="b"/>
+      </el-select>
+    </el-form-item>
+  </el-form>
+  <template #footer><el-button @click="showEditTable=false">取消</el-button><el-button type="primary" @click="doEditTable">保存</el-button></template>
+</el-dialog>
+
 <!-- 新增表 -->
 <el-dialog v-model="showAddTable" title="新增数据表" width="400px">
   <el-form>
@@ -172,7 +186,7 @@ const {createApp,ref,onMounted}=Vue
 createApp({setup(){
   const page=ref('tables')
   // 表管理
-  const tables=ref([]),tSearch=ref(''),tBudget=ref(''),tTotal=ref(0),showAddTable=ref(false),addForm=ref({name:'',comment:''}),adding=ref(false)
+  const tables=ref([]),tSearch=ref(''),tBudget=ref(''),tTotal=ref(0),showAddTable=ref(false),addForm=ref({name:'',comment:''}),adding=ref(false),showEditTable=ref(false),editForm=ref({table_name:'',comment:'',budget_type:''})
   const budgetTypes=['一般公共预算','社会保险','国有资本','政府性基金','字典表','其他']
   // 文档
   const docs=ref([]),dSearch=ref(''),showUpload=ref(false),uploadFile=ref(null)
@@ -188,6 +202,8 @@ createApp({setup(){
   const loadTables=async(p=1)=>{let r=await api(`/api/admin/tables?search=${tSearch.value}&budget_type=${tBudget.value}&page=${p}`);tables.value=r.tables;tTotal.value=r.total}
   const viewTable=async(row)=>{let r=await api(`/api/admin/tables/${row.table_name}`);alert(JSON.stringify(r.columns_json||[],null,2))}
   const doAddTable=async()=>{adding.value=true;await api('/api/admin/tables',{method:'POST',body:JSON.stringify(addForm.value)});adding.value=false;showAddTable.value=false;addForm.value={name:'',comment:''};loadTables();ElementPlus.ElMessage.success('表已添加')}
+  const editTable=(row)=>{editForm.value={table_name:row.table_name,comment:row.comment||'',budget_type:row.budget_type||'其他'};showEditTable.value=true}
+  const doEditTable=async()=>{await api(`/api/admin/tables/${editForm.value.table_name}`,{method:'PUT',body:JSON.stringify({comment:editForm.value.comment,budget_type:editForm.value.budget_type})});showEditTable.value=false;loadTables();ElementPlus.ElMessage.success('已更新')}
   const toggleTable=async(row)=>{await api(`/api/admin/tables/${row.table_name}/toggle`,{method:'PUT'});loadTables()}
   const syncTable=async(row)=>{await api(`/api/admin/tables/${row.table_name}/sync`,{method:'POST'});ElementPlus.ElMessage.success('同步完成');loadTables()}
   const delTable=async(row)=>{if(confirm('确定要禁用此表？')){await api(`/api/admin/tables/${row.table_name}`,{method:'DELETE'});loadTables()}}
@@ -211,7 +227,7 @@ createApp({setup(){
   const goChat=()=>{location.href='/'}
 
   onMounted(async()=>{regionTree.value=[await api('/api/admin/regions/tree')];loadTables();loadDocs();loadLogs()})
-  return{page,tables,tSearch,tBudget,tTotal,budgetTypes,showAddTable,addForm,adding,viewTable,doAddTable,toggleTable,syncTable,delTable,loadTables,docs,dSearch,showUpload,uploadFile,onFileChange,doUpload,toggleDoc,delDoc,loadDocs,showRegions,regionTarget,editRegions,currentRegions,newRegion,addRegion,removeRegion,setAllRegions,clearRegions,saveRegions,regionLabel,regionTree,ovRegion,ovData,loadOverview,logs,logTotal,loadLogs,goChat}
+  return{page,tables,tSearch,tBudget,tTotal,budgetTypes,showAddTable,addForm,adding,showEditTable,editForm,viewTable,doAddTable,editTable,doEditTable,toggleTable,syncTable,delTable,loadTables,docs,dSearch,showUpload,uploadFile,onFileChange,doUpload,toggleDoc,delDoc,loadDocs,showRegions,regionTarget,editRegions,currentRegions,newRegion,addRegion,removeRegion,setAllRegions,clearRegions,saveRegions,regionLabel,regionTree,ovRegion,ovData,loadOverview,logs,logTotal,loadLogs,goChat}
 }}).use(ElementPlus).mount('#app')
 </script>
 </body>
