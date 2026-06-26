@@ -33,7 +33,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from openai import OpenAI
 from agent_loop import agent_runner_loop
 from tools.schema import TOOLS_SCHEMA
-from tools import db_connection, db_query, pattern_store
+from tools import db_connection, db_query, pattern_store, memory_core
 
 
 # ==== 请求/响应模型 ====
@@ -152,7 +152,13 @@ def chat(req: ChatRequest):
     client = _build_client()
     system_prompt = _load_system_prompt()
 
-    # 注入连接上下文
+    # 注入工作记忆
+    wm = memory_core.load_working_memory()
+    if wm.get("discoveries"):
+        system_prompt += "\n[工作记忆] "
+        system_prompt += "; ".join(f"{k}={v}" for k, v in list(wm["discoveries"].items())[-5:])
+
+    # DB连接
     conn = db_connection._conn_info or {}
     system_prompt += f"\n\n[DB: dameng, schema={conn.get('schema', '')}, 已连接。禁止调connect_db，直接调run_sql查数据。]"
 
@@ -263,7 +269,13 @@ async def chat_stream(req: ChatRequest):
     client = _build_client()
     system_prompt = _load_system_prompt()
 
-    # 注入连接上下文
+    # 注入工作记忆
+    wm = memory_core.load_working_memory()
+    if wm.get("discoveries"):
+        system_prompt += "\n[工作记忆] "
+        system_prompt += "; ".join(f"{k}={v}" for k, v in list(wm["discoveries"].items())[-5:])
+
+    # DB连接
     conn = db_connection._conn_info or {}
     system_prompt += (
         f"\n\n[DB: dameng, schema={conn.get('schema', '')}, 已连接，勿调connect_db]"
@@ -441,14 +453,14 @@ def main():
     # 启动时自动连接数据库
     try:
         db_connection.connect_db(
-            db_type=os.environ.get("DB_TYPE", "dameng"),
-            host=os.environ.get("DB_HOST", "localhost"),
-            port=int(os.environ.get("DB_PORT", "5236")),
-            user=os.environ.get("DB_USER", "SYSDBA"),
-            password=os.environ.get("DB_PASSWORD", "SYSDBA001"),
-            schema=os.environ.get("DB_SCHEMA", "RDYS_PUBLIC_TBS")
+            db_type=os.environ["DB_TYPE"],
+            host=os.environ["DB_HOST"],
+            port=int(os.environ["DB_PORT"]),
+            user=os.environ["DB_USER"],
+            password=os.environ["DB_PASSWORD"],
+            schema=os.environ["DB_SCHEMA"]
         )
-        print(f"[启动] 已自动连接数据库 {os.environ.get('DB_SCHEMA', 'RDYS_PUBLIC_TBS')}")
+        print(f"[启动] 已自动连接数据库 {os.environ['DB_SCHEMA']}")
     except Exception as e:
         print(f"[启动] 数据库自动连接失败: {e}")
     uvicorn.run(app, host="0.0.0.0", port=8000)

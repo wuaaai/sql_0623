@@ -10,10 +10,10 @@ import os
 import requests
 from typing import List
 
-# 配置
-EMBEDDING_URL = os.environ.get("RAG_EMBEDDING_URL", "http://10.32.10.160:8991/embed")
-RERANK_URL = os.environ.get("RAG_RERANK_URL", "http://10.32.10.160:8991/rerank")
-DB_CONNECTION = os.environ.get("RAG_DB_CONNECTION", "postgresql+psycopg2://postgres:ROOT@127.0.0.1:5432/postgres?client_encoding=utf8")
+# 配置（统一从 .env 读取）
+EMBEDDING_URL = os.environ["RAG_EMBEDDING_URL"]
+RERANK_URL = os.environ["RAG_RERANK_URL"]
+DB_CONNECTION = os.environ["RAG_DB_CONNECTION"]
 COLLECTION_NAME = os.environ.get("RAG_COLLECTION", "parent_child_db_1024")
 
 _rag_initialized = False

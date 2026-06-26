@@ -9,8 +9,8 @@ import os, sys, json, hashlib, requests
 from typing import List
 from docx import Document as DocxDocument
 
-EMBEDDING_URL = os.environ.get("RAG_EMBEDDING_URL", "http://10.32.10.160:8991/embed")
-DB_CONNECTION = os.environ.get("RAG_DB_CONNECTION", "postgresql+psycopg2://postgres:ROOT@127.0.0.1:5432/postgres?client_encoding=utf8")
+EMBEDDING_URL = os.environ["RAG_EMBEDDING_URL"]
+DB_CONNECTION = os.environ["RAG_DB_CONNECTION"]
 COLLECTION_NAME = os.environ.get("RAG_COLLECTION", "parent_child_db_1024")
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 IMAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "images")
