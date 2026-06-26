@@ -2,7 +2,7 @@
   <div>
     <div class="toolbar">
       <el-input v-model="search" placeholder="搜索表名或注释" clearable @input="load" style="width:240px"/>
-      <el-select v-model="budget" placeholder="全部类型" clearable @change="load" style="width:150px">
+      <el-select v-model="budget" placeholder="全部类型" clearable @change="()=>load()" style="width:150px">
         <el-option v-for="b in types" :key="b" :label="b" :value="b"/>
       </el-select>
       <div class="spacer"/>
