@@ -152,6 +152,12 @@ def chat(req: ChatRequest):
     client = _build_client()
     system_prompt = _load_system_prompt()
 
+    # L0 元规则（最高优先级，永远生效）
+    l0_path = os.path.join(os.path.dirname(__file__), "memory", "L0_meta_rules.md")
+    if os.path.exists(l0_path):
+        with open(l0_path, "r", encoding="utf-8") as f:
+            system_prompt = f.read() + "\n\n" + system_prompt
+
     # 注入工作记忆
     wm = memory_core.load_working_memory()
     if wm.get("discoveries"):
@@ -268,6 +274,12 @@ async def chat_stream(req: ChatRequest):
 
     client = _build_client()
     system_prompt = _load_system_prompt()
+
+    # L0 元规则（最高优先级，永远生效）
+    l0_path = os.path.join(os.path.dirname(__file__), "memory", "L0_meta_rules.md")
+    if os.path.exists(l0_path):
+        with open(l0_path, "r", encoding="utf-8") as f:
+            system_prompt = f.read() + "\n\n" + system_prompt
 
     # 注入工作记忆
     wm = memory_core.load_working_memory()
