@@ -306,5 +306,19 @@ TOOLS_SCHEMA = [
                 "required": ["keyword"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "rag_search",
+            "description": "搜索预算解读知识库（政策文档、预算解读等非结构化知识）。当用户问政策/规定/解读/编制要求等文档类问题时使用。注意：查具体数据（收入/支出/金额/排名）用 run_sql，查政策知识用 rag_search。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "检索查询文本"}
+                },
+                "required": ["query"]
+            }
+        }
     }
 ]
