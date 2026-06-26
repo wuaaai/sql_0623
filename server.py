@@ -556,8 +556,6 @@ def index():
 
 def main():
     import uvicorn
-    # 初始化管理数据库
-    admin_db.init_db()
     # 启动时自动连接数据库
     try:
         db_connection.connect_db(
@@ -571,6 +569,8 @@ def main():
         print(f"[启动] 已自动连接数据库 {os.environ['DB_SCHEMA']}")
     except Exception as e:
         print(f"[启动] 数据库自动连接失败: {e}")
+    # 初始化管理数据库（依赖达梦连接）
+    admin_db.init_db()
     uvicorn.run(app, host="127.0.0.1", port=8000)
 
 
