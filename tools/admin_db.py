@@ -73,34 +73,72 @@ def init_db():
     if count == 0:
         _auto_import_tables(db)
 
+    # 自动从pgvector导入文档列表
+    doc_count = db.execute("SELECT COUNT(*) FROM document_metadata").fetchone()[0]
+    if doc_count == 0:
+        _auto_import_documents(db)
+
     db.close()
     print(f"[AdminDB] 初始化完成 (data/admin.db)")
 
 
 def _auto_import_tables(db):
-    """从达梦数据库自动导入所有表"""
+    """从达梦数据库自动导入所有表（含注释）"""
     try:
         from tools import db_connection, db_schema
         if db_connection._connection is None:
             print("[AdminDB] 达梦未连接，跳过自动导入")
             return
 
+        # 获取表注释
+        comments = {}
+        try:
+            cur = db_connection._connection.cursor()
+            cur.execute("SELECT TABLE_NAME, COMMENTS FROM ALL_TAB_COMMENTS WHERE OWNER='RDYS_PUBLIC_TBS' AND COMMENTS IS NOT NULL")
+            for row in cur.fetchall():
+                comments[row[0]] = row[1] if row[1] else ""
+        except Exception:
+            pass
+
         tables = []
         for t in db_connection.list_tables().get("tables", []):
             desc = db_schema.describe_table(t)
-            tables.append((t, desc.get("column_count", 0), json.dumps(desc.get("columns", []), ensure_ascii=False)))
+            comment = comments.get(t, "")
+            tables.append((t, comment, desc.get("column_count", 0), json.dumps(desc.get("columns", []), ensure_ascii=False)))
 
         db.executemany(
-            "INSERT INTO table_metadata (table_name, column_count, columns_json) VALUES (?, ?, ?)",
+            "INSERT INTO table_metadata (table_name, comment, column_count, columns_json) VALUES (?, ?, ?, ?)",
             tables
         )
-        # 自动归类预算类型
         for prefix, btype in [("YBGGYS","一般公共预算"),("SHBXJJ","社会保险"),("GYZBJY","国有资本"),("ZFXJJ","政府性基金"),("RDYS_BAS","字典表")]:
             db.execute("UPDATE table_metadata SET budget_type=? WHERE table_name LIKE ?", (btype, f"%{prefix}%"))
         db.commit()
-        print(f"[AdminDB] 已导入 {len(tables)} 张表")
+        print(f"[AdminDB] 已导入 {len(tables)} 张表（含注释）")
     except Exception as e:
         print(f"[AdminDB] 自动导入失败: {e}")
+
+
+def _auto_import_documents(db):
+    """从pgvector自动导入文档列表"""
+    try:
+        db_conn_str = os.environ.get("RAG_DB_CONNECTION", "postgresql+psycopg2://postgres:ROOT@127.0.0.1:5432/postgres")
+        coll = os.environ.get("RAG_COLLECTION", "parent_child_db_1024")
+        from sqlalchemy import create_engine, text as sql_text
+        engine = create_engine(db_conn_str)
+        with engine.connect() as conn:
+            result = conn.execute(sql_text(
+                f"SELECT c_metadata::jsonb->>'source' as source, COUNT(*) as cnt FROM {coll} GROUP BY source"
+            ))
+            rows = result.fetchall()
+        for row in rows:
+            source, cnt = row[0], row[1]
+            if source:
+                db.execute("INSERT OR IGNORE INTO document_metadata (source, file_path, chunk_count) VALUES (?,?,?)",
+                           (source, f"data/{source}", cnt))
+        db.commit()
+        print(f"[AdminDB] 已导入 {len(rows)} 个文档")
+    except Exception as e:
+        print(f"[AdminDB] 文档导入失败: {e}")
 
 
 def _now(): return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
