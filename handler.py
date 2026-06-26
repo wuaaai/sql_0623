@@ -8,7 +8,7 @@ dispatch(tool_name, args) → do_<tool_name>(args) → StepOutcome
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from tools import db_connection, db_query, db_schema, time_resolver, db_aggregation, db_cross_table, db_advanced, error_handler, pattern_store
+from tools import db_connection, db_query, db_schema, time_resolver, db_aggregation, db_cross_table, db_advanced, error_handler, pattern_store, memory_core, rag_tool, admin_db
 
 
 @dataclass
@@ -83,6 +83,14 @@ class TextToSQLHandler(BaseHandler):
 
     def do_run_sql(self, args: dict) -> StepOutcome:
         sql = args["sql"]
+        # 管理权限检查：表是否被禁用/是否有地区限制
+        allowed, result_or_sql = admin_db.check_table_permission(sql)
+        if not allowed:
+            return StepOutcome(
+                {"status": "error", "message": result_or_sql},
+                next_prompt=f"SQL执行被拦截: {result_or_sql}\n请告知用户此表暂不可用。"
+            )
+        sql = result_or_sql
         result = db_query.run_sql(sql)
 
         if result["status"] == "success":
@@ -409,6 +417,26 @@ class TextToSQLHandler(BaseHandler):
                 next_prompt=f"找到{result['matched']}条相似历史查询:\n{patterns_desc}\n请参考以上模式的表名和列名改写SQL，不需要重新explore。"
             )
         return StepOutcome(data=result, next_prompt=f"未找到相似历史查询，正常探索表结构。总模式库: {result.get('total_patterns',0)}条。")
+
+    def do_search_memory(self, args: dict) -> StepOutcome:
+        result = memory_core.search_memory(
+            keyword=args["keyword"],
+            layer=args.get("layer", "all")
+        )
+        if result["matched"] > 0:
+            lines = [f"[{r['layer']}] {r['title']}" for r in result["results"]]
+            return StepOutcome(data=result, next_prompt=f"记忆搜索 '{args['keyword']}' 找到{result['matched']}条:\n" + "\n".join(lines))
+        return StepOutcome(data=result, next_prompt=f"记忆搜索无结果。总记忆条目: 正常。")
+
+    def do_rag_search(self, args: dict) -> StepOutcome:
+        result = rag_tool.rag_search(args["query"])
+        if result["status"] == "ok" and result.get("documents"):
+            docs_text = "\n---\n".join(f"[文档{i+1}] {d[:500]}" for i, d in enumerate(result["documents"]))
+            return StepOutcome(
+                data=result,
+                next_prompt=f"知识库检索到{result['document_count']}条内容:\n{docs_text}\n请基于知识库内容回答用户问题。"
+            )
+        return StepOutcome(data=result, next_prompt=f"知识库检索: {result.get('message', '无结果')}")
 
 
 def _extract_table_from_sql(sql: str) -> str:
