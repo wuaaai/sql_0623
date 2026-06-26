@@ -1,46 +1,33 @@
 """
-RAG 知识库检索 — 自包含模块（不依赖 Langchain (2) 项目）
+RAG 知识库检索 — 自包含模块
 
-embedding/rerank: HTTP API (10.32.10.160:30189)
+Embedding: POST http://10.32.10.160:8991/embed (本地格式)
+Rerank: POST http://10.32.10.160:8991/rerank?query=xxx (本地格式)
 向量存储: PostgreSQL + Vastbase FloatVector
 """
 
-import json
 import os
 import requests
-from typing import List, Optional
+from typing import List
 
-
-# ========== 配置（从环境变量读取） ==========
-EMBEDDING_URL = os.environ.get("RAG_EMBEDDING_URL", "http://10.32.10.160:30189/v1/embeddings")
-EMBEDDING_MODEL = os.environ.get("RAG_EMBEDDING_MODEL", "/workspace/bge-m3")
-RERANK_URL = os.environ.get("RAG_RERANK_URL", "http://10.32.10.160:30189/v1/rerank")
-RERANK_MODEL = os.environ.get("RAG_RERANK_MODEL", "/workspace/bge-reranker-large")
+# 配置
+EMBEDDING_URL = os.environ.get("RAG_EMBEDDING_URL", "http://10.32.10.160:8991/embed")
+RERANK_URL = os.environ.get("RAG_RERANK_URL", "http://10.32.10.160:8991/rerank")
 DB_CONNECTION = os.environ.get("RAG_DB_CONNECTION", "postgresql+psycopg2://postgres:123456@localhost:5432/postgres")
 COLLECTION_NAME = os.environ.get("RAG_COLLECTION", "parent_child_db_1024")
 
 _rag_initialized = False
-_embeddings = None
 _vector_store = None
 
 
-def _build_headers(api_key: str = "") -> dict:
-    h = {"Content-Type": "application/json"}
-    if api_key:
-        h["Authorization"] = f"Bearer {api_key}"
-    return h
-
-
-# ========== Embedding 服务 ==========
 def _embed_texts(texts: List[str]) -> List[List[float]]:
-    """调用 embedding API，兼容 OpenAI 格式"""
+    """POST /embed body=[texts] → {"embeddings": [[...], ...]}"""
     try:
-        payload = {"input": texts, "model": EMBEDDING_MODEL}
-        resp = requests.post(EMBEDDING_URL, json=payload, headers=_build_headers(), timeout=60)
+        resp = requests.post(EMBEDDING_URL, json=texts, timeout=60)
         resp.raise_for_status()
         data = resp.json()
-        if "data" in data:
-            return [item["embedding"] for item in sorted(data["data"], key=lambda x: x.get("index", 0))]
+        if "embeddings" in data:
+            return data["embeddings"]
         return []
     except Exception as e:
         print(f"[RAG] Embedding失败: {e}")
@@ -52,37 +39,28 @@ def _embed_query(text: str) -> List[float]:
     return embs[0] if embs else []
 
 
-# ========== Rerank 服务 ==========
 def _rerank(query: str, texts: List[str]) -> List[dict]:
-    """调用 rerank API，返回排序后的 [{text, score}]"""
+    """POST /rerank?query=xxx body=[texts] → {"ranked_documents": [...], "scores": [...]}"""
     if not texts:
         return []
     try:
-        payload = {"query": query, "documents": texts, "model": RERANK_MODEL}
-        resp = requests.post(RERANK_URL, json=payload, headers=_build_headers(), timeout=30)
+        resp = requests.post(RERANK_URL, params={"query": query}, json=texts, timeout=30)
         resp.raise_for_status()
         data = resp.json()
-        if "results" in data:
-            items = sorted(data["results"], key=lambda x: x.get("relevance_score", 0), reverse=True)
-            return [{"text": texts[r["index"]], "score": r.get("relevance_score", 0)}
-                    for r in items if r.get("index", -1) < len(texts)]
-        if "data" in data:
-            items = sorted(data["data"], key=lambda x: x.get("score", 0), reverse=True)
-            return [{"text": texts[r["index"]], "score": r.get("score", 0)}
-                    for r in items if r.get("index", -1) < len(texts)]
+        if "ranked_documents" in data and "scores" in data:
+            ranked = data["ranked_documents"]
+            scores = data["scores"]
+            return [{"text": t, "score": float(s)} for t, s in zip(ranked, scores)]
         return [{"text": t, "score": 0.0} for t in texts]
     except Exception as e:
         print(f"[RAG] Rerank失败: {e}")
         return [{"text": t, "score": float(len(texts) - i)} for i, t in enumerate(texts)]
 
 
-# ========== 向量检索 ==========
 def _init_vector_store():
-    """初始化向量存储（延迟加载）"""
     global _rag_initialized, _vector_store
     if _rag_initialized:
         return _vector_store is not None
-
     try:
         from sqlalchemy import create_engine, Column, Integer, Text
         from sqlalchemy.orm import declarative_base, Session
@@ -104,60 +82,39 @@ def _init_vector_store():
         print("[RAG] 向量存储初始化成功")
         return True
     except ImportError as e:
-        print(f"[RAG] 向量存储初始化失败(缺少vastbase模块): {e}")
+        print(f"[RAG] 向量存储不可用(缺少vastbase): {e}")
         _rag_initialized = True
         return False
 
 
 def _vector_search(query_embedding: List[float], k: int = 10) -> List[str]:
-    """向量相似度检索，返回文档文本列表"""
     if not _init_vector_store() or not _vector_store:
         return []
-
     try:
         TableCls = _vector_store["table"]
         Session = _vector_store["Session"]
-
         with Session(_vector_store["engine"]) as session:
             emb_col = TableCls.c_embedding
-            distance_expr = emb_col.cosine_distance(query_embedding)
+            dist = emb_col.cosine_distance(query_embedding)
             from sqlalchemy import text as sql_text
-            rows = session.query(TableCls, distance_expr.label("_distance")) \
-                .order_by(sql_text("_distance")).limit(k).all()
-
-        docs = [row[0].c_document for row in rows if row[0].c_document]
-        return docs
+            rows = session.query(TableCls, dist.label("_d")).order_by(sql_text("_d")).limit(k).all()
+        return [r[0].c_document for r in rows if r[0].c_document]
     except Exception as e:
         print(f"[RAG] 向量检索失败: {e}")
         return []
 
 
-# ========== 对外接口 ==========
 def rag_search(query: str, top_k: int = 5) -> dict:
-    """
-    搜索预算解读知识库: 向量粗排(k=10) → Rerank精排 → 返回top_k文档片段
-    """
-    # Step 1: 生成查询向量
-    query_emb = _embed_query(query)
-    if not query_emb:
-        return {"status": "error", "message": "Embedding服务不可用，请检查网络连接"}
+    """搜索知识库: 向量粗排(k=10) → Rerank精排 → 返回top_k"""
+    q_emb = _embed_query(query)
+    if not q_emb:
+        return {"status": "error", "message": "Embedding服务不可用"}
 
-    # Step 2: 向量检索粗排
-    docs = _vector_search(query_emb, k=10)
+    docs = _vector_search(q_emb, k=10)
     if not docs:
-        return {"status": "error", "message": "向量数据库无匹配结果或连接失败"}
+        return {"status": "error", "message": "向量库无匹配结果或连接失败"}
 
-    # Step 3: Rerank 精排
     ranked = _rerank(query, docs)
-    top_docs = ranked[:top_k]
+    top = [d["text"][:800] for d in ranked[:top_k] if d.get("text")]
 
-    # Step 4: 返回结果
-    documents = [d["text"][:800] for d in top_docs if d.get("text")]
-
-    return {
-        "status": "ok",
-        "query": query,
-        "document_count": len(documents),
-        "documents": documents,
-        "sources": ["河北省预算解读知识库"]
-    }
+    return {"status": "ok", "query": query, "document_count": len(top), "documents": top}
