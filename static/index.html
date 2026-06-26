@@ -489,8 +489,9 @@
           </template>
 
           <!-- AI 文字回答 -->
-          <template v-if="msg.role === 'assistant' && msg._html">
-            <div v-html="msg._html"></div>
+          <template v-if="msg.role === 'assistant' && (msg._html || msg.answer_text)">
+            <div v-if="msg._html" v-html="msg._html"></div>
+            <div v-else style="white-space:pre-wrap;">{{ msg.answer_text }}</div>
           </template>
 
           <!-- SQL 块 -->
@@ -712,7 +713,7 @@ const app = createApp({
                 const event = JSON.parse(line.slice(6))
                 if (event.type === 'text') {
                   aiMsg.answer_text += event.text
-                  aiMsg._html = renderMarkdown(aiMsg.answer_text)
+                  // 流式期间不渲染markdown，等流结束后一次性渲染
                 } else if (event.type === 'done') {
                   aiMsg.sql = event.sql || ''
                   aiMsg.columns = event.columns || []
