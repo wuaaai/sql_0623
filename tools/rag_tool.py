@@ -13,7 +13,7 @@ from typing import List
 # 配置
 EMBEDDING_URL = os.environ.get("RAG_EMBEDDING_URL", "http://10.32.10.160:8991/embed")
 RERANK_URL = os.environ.get("RAG_RERANK_URL", "http://10.32.10.160:8991/rerank")
-DB_CONNECTION = os.environ.get("RAG_DB_CONNECTION", "postgresql+psycopg2://postgres:123456@localhost:5432/postgres")
+DB_CONNECTION = os.environ.get("RAG_DB_CONNECTION", "postgresql+psycopg2://postgres:ROOT@127.0.0.1:5432/postgres?client_encoding=utf8")
 COLLECTION_NAME = os.environ.get("RAG_COLLECTION", "parent_child_db_1024")
 
 _rag_initialized = False
@@ -64,7 +64,7 @@ def _init_vector_store():
     try:
         from sqlalchemy import create_engine, Column, Integer, Text
         from sqlalchemy.orm import declarative_base, Session
-        from vastbase.sqlalchemy import FloatVector
+        from pgvector.sqlalchemy import Vector
 
         Base = declarative_base()
 
@@ -73,34 +73,33 @@ def _init_vector_store():
             __table_args__ = {"extend_existing": True}
             id = Column(Integer, primary_key=True, autoincrement=True)
             c_document = Column(Text)
-            c_embedding = Column(FloatVector(1024))
+            c_embedding = Column(Vector(1024))
             c_metadata = Column(Text, default="{}")
 
         engine = create_engine(DB_CONNECTION, pool_pre_ping=True)
         _vector_store = {"engine": engine, "table": RagDoc, "Session": Session}
         _rag_initialized = True
-        print("[RAG] 向量存储初始化成功")
+        print("[RAG] pgvector vector store ready")
         return True
     except ImportError as e:
-        print(f"[RAG] 向量存储不可用(缺少vastbase): {e}")
+        print(f"[RAG] pgvector not available: {e}")
         _rag_initialized = True
         return False
 
 
-def _vector_search(query_embedding: List[float], k: int = 10) -> List[str]:
+def _vector_search(query_embedding, k=10):
     if not _init_vector_store() or not _vector_store:
         return []
     try:
         TableCls = _vector_store["table"]
         Session = _vector_store["Session"]
         with Session(_vector_store["engine"]) as session:
-            emb_col = TableCls.c_embedding
-            dist = emb_col.cosine_distance(query_embedding)
-            from sqlalchemy import text as sql_text
-            rows = session.query(TableCls, dist.label("_d")).order_by(sql_text("_d")).limit(k).all()
-        return [r[0].c_document for r in rows if r[0].c_document]
+            rows = session.query(TableCls).order_by(
+                TableCls.c_embedding.cosine_distance(query_embedding)
+            ).limit(k).all()
+        return [r.c_document for r in rows if r.c_document]
     except Exception as e:
-        print(f"[RAG] 向量检索失败: {e}")
+        print(f"[RAG] vector search failed: {e}")
         return []
 
 

@@ -7,3 +7,4 @@ venv/
 temp/
 .env
 query_patterns/
+data/
