@@ -14,7 +14,11 @@ body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#f0f2f5;d
 .nav-item:hover{background:#263445}
 .nav-item.active{background:#263445;color:#409eff;border-left-color:#409eff}
 .nav-back{margin-top:auto;border-top:1px solid #3a4f66;color:#909399}
-.main{flex:1;overflow-y:auto;padding:24px;min-width:0}
+.main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.navbar{height:50px;background:#fff;border-bottom:1px solid #e4e7ed;display:flex;align-items:center;padding:0 24px;flex-shrink:0}
+.navbar .title{font-size:16px;font-weight:600;color:#303133}
+.navbar .breadcrumb{margin-left:12px;font-size:13px;color:#909399}
+.content{flex:1;overflow-y:auto;padding:20px 24px}
 .header{font-size:18px;font-weight:600;margin-bottom:20px;color:#303133}
 .toolbar{display:flex;gap:12px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
 .toolbar>*{flex-shrink:0}
@@ -41,6 +45,11 @@ body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#f0f2f5;d
   </div>
 
   <div class="main">
+    <div class="navbar">
+      <span class="title">{{pageTitle}}</span>
+      <span class="breadcrumb">/ 管理后台 / {{pageTitle}}</span>
+    </div>
+    <div class="content">
 
     <!-- ========== 数据表管理 ========== -->
     <template v-if="page==='tables'">
@@ -145,6 +154,7 @@ body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#f0f2f5;d
       </div>
     </template>
 
+    </div>
   </div>
 
   <!-- 新增表对话框 -->
@@ -204,9 +214,10 @@ body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#f0f2f5;d
 <script src="https://unpkg.com/element-plus"></script>
 <script src="https://unpkg.com/@element-plus/icons-vue"></script>
 <script>
-const {createApp,ref,onMounted}=Vue
+const {createApp,ref,onMounted,computed}=Vue
 createApp({setup(){
   const page=ref('tables')
+  const pageTitle=computed(()=>({tables:'数据表管理',docs:'文档管理',overview:'权限总览',logs:'操作日志'})[page.value]||'')
   const tables=ref([]),tSearch=ref(''),tBudget=ref(''),tTotal=ref(0),tLoading=ref(false)
   const showAddTable=ref(false),addForm=ref({name:'',comment:''}),adding=ref(false)
   const showEditTable=ref(false),editForm=ref({table_name:'',comment:'',budget_type:'其他'})
@@ -255,7 +266,7 @@ createApp({setup(){
 
   onMounted(async()=>{let tree=await api('/api/admin/regions/tree');regionTree.value=[tree];loadTables();loadDocs();loadLogs()})
 
-  return{page,tables,tSearch,tBudget,tTotal,tLoading,budgetTypes,showAddTable,addForm,adding,showEditTable,editForm,viewTable,doAddTable,editTable,doEditTable,toggleTable,syncTable,delTable,loadTables,docs,dSearch,dLoading,showUpload,uploadFile,uploading,onFileChange,doUpload,toggleDoc,delDoc,loadDocs,showRegions,regionTarget,editRegions,currentRegions,newRegion,addRegion,removeRegion,setAllRegions,clearRegions,saveRegions,regionLabel,regionTree,ovRegion,ovData,loadOverview,logs,logTotal,loadLogs,goChat}
+  return{page,pageTitle,tables,tSearch,tBudget,tTotal,tLoading,budgetTypes,showAddTable,addForm,adding,showEditTable,editForm,viewTable,doAddTable,editTable,doEditTable,toggleTable,syncTable,delTable,loadTables,docs,dSearch,dLoading,showUpload,uploadFile,uploading,onFileChange,doUpload,toggleDoc,delDoc,loadDocs,showRegions,regionTarget,editRegions,currentRegions,newRegion,addRegion,removeRegion,setAllRegions,clearRegions,saveRegions,regionLabel,regionTree,ovRegion,ovData,loadOverview,logs,logTotal,loadLogs,goChat}
 }}).use(ElementPlus).mount('#app')
 </script>
 </body>
