@@ -70,40 +70,56 @@ class ChatResponse(BaseModel):
 app = FastAPI(title="Text-to-SQL Agent", version="0.1.0")
 
 
-def _inject_skills(system_prompt: str, question: str) -> str:
-    """根据用户问题关键词匹配技能文件，注入到 system_prompt"""
-    index_path = os.path.join(os.path.dirname(__file__), "memory", "skills_index.json")
-    if not os.path.exists(index_path):
-        return system_prompt
+def _inject_guidance(system_prompt: str, question: str) -> str:
+    """注入业务指引（指标模板优先，技能文件兜底）"""
+    # Step 1: 尝试匹配业务指标
+    budget = _detect_budget_type(question)
+    intent = _detect_intent(question)
+    if budget and intent:
+        try:
+            from tools.business_loader import load_business_metric
+            metric = load_business_metric(budget, intent)
+            if metric["matched"] > 0:
+                m = metric["metrics"][0]
+                system_prompt += (
+                    f"\n\n[强制执行-业务指标匹配]\n"
+                    f"指标: {m['name']}\n表名: {m['table']}\n"
+                    f"列名: {', '.join(m['columns'][:8])}\n"
+                    f"筛选: {', '.join(m.get('default_filters',[]))}\n"
+                    f"SQL模板: {m['sql_template']}\n"
+                    f"【禁止调 search_schema 和 describe_table。直接用上表名写SQL。】\n"
+                )
+                return system_prompt
+        except Exception:
+            pass
+
+    # Step 2: 无指标匹配时，注入技能文件参考
+    return _inject_skills(system_prompt, question)
+
+
+def _detect_budget_type(question: str) -> str:
     try:
-        with open(index_path, encoding="utf-8") as f:
-            index = json.load(f)
-    except Exception:
-        return system_prompt
+        path = os.path.join(os.path.dirname(__file__), "memory", "business_rules.json")
+        with open(path, encoding="utf-8") as f:
+            rules = json.load(f)
+        for name, info in rules.get("budget_types", {}).items():
+            if name in question: return name
+            for alias in info.get("aliases", []):
+                if alias in question: return name
+    except Exception: pass
+    return ""
 
-    skills_dir = os.path.join(os.path.dirname(__file__), "memory", "skills")
-    matched = []
-    for skill in index.get("skills", []):
-        if skill.get("priority", 1) > 2:
-            continue
-        for trigger in skill.get("triggers", []):
-            if trigger in question:
-                matched.append(skill)
-                break
 
-    if matched:
-        system_prompt += "\n\n## 相关业务知识\n"
-        for s in sorted(matched, key=lambda x: x.get("priority", 1)):
-            skill_path = os.path.join(skills_dir, s["file"])
-            if os.path.exists(skill_path):
-                try:
-                    with open(skill_path, encoding="utf-8") as f:
-                        system_prompt += f"\n### {s['file']}\n{f.read()[:600]}\n"
-                except Exception:
-                    pass
-
-    return system_prompt
-
+def _detect_intent(question: str) -> str:
+    try:
+        path = os.path.join(os.path.dirname(__file__), "memory", "business_rules.json")
+        with open(path, encoding="utf-8") as f:
+            rules = json.load(f)
+        for name, info in rules.get("column_patterns", {}).items():
+            for kw in info.get("keywords", []):
+                if kw in question: return name
+    except Exception: pass
+    return ""
 
 def _load_system_prompt() -> str:
     prompt_path = os.path.join(os.path.dirname(__file__), "prompts", "system_prompt.txt")
@@ -122,34 +138,9 @@ def _build_client():
 
 # ==== 自定义 Handler: 捕获 SQL 和查询结果 ====
 
-from handler import TextToSQLHandler, StepOutcome
+from handler import TextToSQLHandler, StepOutcome, ServerHandler
 
 
-class ServerHandler(TextToSQLHandler):
-    """服务端 Handler, 额外捕获 SQL 和结果"""
-
-    def __init__(self):
-        super().__init__()
-        self.captured_sql = None
-        self.captured_columns = None
-        self.captured_rows = None
-        self.captured_table = None
-
-    def do_run_sql(self, args: dict) -> StepOutcome:
-        self.captured_sql = args.get("sql", "")
-        # 从SQL提取表名
-        import re
-        m = re.search(r'\bFROM\s+([a-zA-Z_][\w.]*)', self.captured_sql or "", re.IGNORECASE)
-        if m:
-            self.captured_table = m.group(1)
-        outcome = super().do_run_sql(args)
-        if outcome.data and outcome.data.get("status") == "success":
-            self.captured_columns = outcome.data.get("columns", [])
-            self.captured_rows = outcome.data.get("rows", [])
-        return outcome
-
-
-# ==== API 路由 ====
 
 @app.get("/api/health")
 def health():
@@ -187,7 +178,7 @@ def chat(req: ChatRequest):
 
     client = _build_client()
     system_prompt = _load_system_prompt()
-    system_prompt = _inject_skills(system_prompt, req.question)
+    system_prompt = _inject_guidance(system_prompt, req.question)
 
     # L0 元规则（最高优先级，永远生效）
     l0_path = os.path.join(os.path.dirname(__file__), "memory", "L0_meta_rules.md")
@@ -320,7 +311,7 @@ async def chat_stream(req: ChatRequest):
 
     client = _build_client()
     system_prompt = _load_system_prompt()
-    system_prompt = _inject_skills(system_prompt, req.question)
+    system_prompt = _inject_guidance(system_prompt, req.question)
 
     # L0 元规则（最高优先级，永远生效）
     l0_path = os.path.join(os.path.dirname(__file__), "memory", "L0_meta_rules.md")
