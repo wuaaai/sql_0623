@@ -1,0 +1,34 @@
+{
+  "metrics": [
+    {
+      "id": "ybggys_income", "name": "一般公共预算收入", "intent": "完成情况",
+      "table": "RDYS_LD_YSSC_YSZX_QSYBGGYSSRWC",
+      "columns": ["RG_NAME","YEAR_MONTH","XM_NAME","YSS","BYS_JE","BYLJS_JE"],
+      "amount_col": "BYS_JE",
+      "default_filters": ["XM_NAME LIKE '%合%计%'"],
+      "sql_template": "SELECT {columns} FROM {table} WHERE {filters}",
+      "variants": {
+        "排名": {"group_by":"RG_NAME","aggregate":"SUM({amount_col})","order":"DESC","limit":20},
+        "趋势": {"group_by":"YEAR_MONTH","aggregate":"SUM({amount_col})","order":"ASC"},
+        "同比": {"columns_add":["BYS_SNTYS","BYS_TBE","BYS_TBB"]},
+        "累计": {"amount_col":"BYLJS_JE"}
+      }
+    },
+    {
+      "id": "ybggys_expenditure", "name": "一般公共预算支出", "intent": "完成情况",
+      "table": "RDYS_LD_YSSC_YSZX_QSYBGGYSZCWC",
+      "columns": ["RG_NAME","YEAR_MONTH","XM_NAME","YSS","BYS_JE","BYLJS_JE"],
+      "amount_col": "BYS_JE",
+      "default_filters": ["XM_NAME LIKE '%合%计%'"],
+      "sql_template": "SELECT {columns} FROM {table} WHERE {filters}"
+    },
+    {
+      "id": "ybggys_income_yoy", "name": "一般公共预算收入同比", "intent": "同比对比",
+      "table": "RDYS_LD_YSSC_YSZX_QSYBGGYSSRWC",
+      "columns": ["RG_NAME","YEAR_MONTH","XM_NAME","BYS_JE","BYS_SNTYS","BYS_TBE","BYS_TBB"],
+      "amount_col": "BYS_TBB",
+      "default_filters": ["XM_NAME LIKE '%合%计%'"],
+      "sql_template": "SELECT {columns} FROM {table} WHERE {filters} ORDER BY BYS_TBB DESC"
+    }
+  ]
+}
