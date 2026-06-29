@@ -125,13 +125,13 @@ async def dify_chat(request: OpenAIRequest, raw_request: Request):
         region_code, cleaned_q = _extract_region(request.messages)
         question = cleaned_q or next((m.content for m in reversed(request.messages) if m.role == "user"), "")
 
-        # Dify 凭据验证/短测试: 直接返回，不浪费agent调用
-        is_cred_test = len(question) <= 10 or question.lower() in ("ping", "hello", "hi", "test", "你好", "测试", "help", "")
-        if is_cred_test:
+        # Dify 凭据验证: 仅对明确的测试词做快返，真实问题走完整流程
+        _test_words = ("ping", "hello", "hi", "test", "help", "测试", "连接测试")
+        if question.strip().lower() in _test_words or question.strip() == "你好":
             return {
                 "id": f"chatcmpl-{int(time.time())}", "object": "chat.completion",
                 "created": int(time.time()), "model": request.model,
-                "choices": [{"message": {"role": "assistant", "content": "连接成功！我是预算助手，可以查询数据库和知识库。"}, "finish_reason": "stop"}]
+                "choices": [{"message": {"role": "assistant", "content": "连接成功！我是预算助手。"}, "finish_reason": "stop"}]
             }
 
         print(f"[Dify] conv={conversation_id[:8]} q={question[:80]}")
