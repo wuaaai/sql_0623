@@ -70,6 +70,35 @@ class ChatResponse(BaseModel):
 app = FastAPI(title="Text-to-SQL Agent", version="0.1.0")
 
 
+def _inject_skills(system_prompt: str, question: str) -> str:
+    """注入技能文件内容到 system_prompt"""
+    index_path = os.path.join(os.path.dirname(__file__), "memory", "skills_index.json")
+    if not os.path.exists(index_path):
+        return system_prompt
+    try:
+        with open(index_path, encoding="utf-8") as f:
+            index = json.load(f)
+    except Exception:
+        return system_prompt
+    skills_dir = os.path.join(os.path.dirname(__file__), "memory", "skills")
+    matched = []
+    for skill in index.get("skills", []):
+        if skill.get("priority", 1) > 2: continue
+        for trigger in skill.get("triggers", []):
+            if trigger in question:
+                matched.append(skill); break
+    if matched:
+        system_prompt += "\n\n## 相关业务知识\n"
+        for s in sorted(matched, key=lambda x: x.get("priority", 1)):
+            sp = os.path.join(skills_dir, s["file"])
+            if os.path.exists(sp):
+                try:
+                    with open(sp, encoding="utf-8") as f:
+                        system_prompt += f"\n### {s['file']}\n{f.read()[:600]}\n"
+                except Exception: pass
+    return system_prompt
+
+
 def _inject_guidance(system_prompt: str, question: str) -> str:
     """注入业务指引（指标模板优先，技能文件兜底）"""
     # Step 1: 尝试匹配业务指标
@@ -144,7 +173,23 @@ from handler import TextToSQLHandler, StepOutcome, ServerHandler
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "connected": db_connection._connection is not None}
+    import time as _time
+    srv = {"status": "ok", "tools": len(TOOLS_SCHEMA)}
+    srv["services"] = {"dameng": "connected" if db_connection._connection else "disconnected"}
+    if db_connection._conn_info: srv["services"]["schema"] = db_connection._conn_info.get("schema","")
+    try:
+        from tools.config import config
+        from sqlalchemy import create_engine, text
+        e = create_engine(config.RAG_DB_CONNECTION)
+        with e.connect() as c: c.execute(text("SELECT 1"))
+        srv["services"]["postgres"] = "connected"
+    except Exception: srv["services"]["postgres"] = "disconnected"
+    try:
+        import requests
+        r = requests.get(config.RAG_EMBEDDING_URL.rsplit("/",1)[0], timeout=3)
+        srv["services"]["embedding"] = "reachable"
+    except Exception: srv["services"]["embedding"] = "unreachable"
+    return srv
 
 
 @app.post("/api/connect")
