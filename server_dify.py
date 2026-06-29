@@ -10,7 +10,7 @@ Text-to-SQL + RAG Dify 兼容后端（完整版）
 相似模式注入/业务指标强制执行/链路追踪/追问限制/查询模式保存
 """
 
-import uvicorn, os, sys, re, time, json, uuid, traceback
+import uvicorn, os, sys, re, time, json, uuid, traceback, asyncio
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -148,7 +148,8 @@ async def dify_chat(request: OpenAIRequest, raw_request: Request):
 
         # DB连接状态（强制声明，防止LLM重复connect_db）
         system_prompt = f"\n[DB状态] 达梦已连接(schema={config.DB_SCHEMA})。禁止调用connect_db。直接调run_sql。\n"
-        system_prompt += "[输出格式] 展示SQL语句时直接写，不要用markdown代码块(```)。\n" + system_prompt
+        system_prompt += "[输出格式] 展示SQL语句时直接写，不要用markdown代码块(```)。\n"
+        system_prompt += "[交互风格] 执行过程中用简短自然的语言告知用户进度，如'正在查询...'、'已找到数据'。不要输出内部步骤(如'匹配到历史模式'、'确认RG_NAME')。\n" + system_prompt
 
         # 工作记忆
         wm = memory_core.load_working_memory()
@@ -217,6 +218,7 @@ async def dify_chat(request: OpenAIRequest, raw_request: Request):
                         delta = {"id":f"chatcmpl-{int(time.time())}","object":"chat.completion.chunk","created":int(time.time()),
                                  "model":request.model,"choices":[{"index":0,"delta":{"content":chunk},"finish_reason":None}]}
                         yield f"data: {json.dumps(delta,ensure_ascii=False)}\n\n"
+                        await asyncio.sleep(0)  # 立即刷新，确保流式输出
 
                 tracer.done(sql=handler.captured_sql or "", rows=len(handler.captured_rows or []))
                 if handler.captured_sql:
