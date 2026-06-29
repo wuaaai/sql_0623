@@ -375,7 +375,7 @@ async def chat_stream(req: ChatRequest):
 
     client = _build_client()
     system_prompt = _load_system_prompt()
-    system_prompt = _inject_guidance(system_prompt, req.question, tracer)
+    system_prompt = _inject_guidance(system_prompt, req.question, _tracer)
 
     # L0 元规则（最高优先级，永远生效）
     l0_path = os.path.join(os.path.dirname(__file__), "memory", "L0_meta_rules.md")
