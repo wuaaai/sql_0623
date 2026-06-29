@@ -91,6 +91,21 @@ def _extract_region(messages: list):
             break
     return None, None
 
+# ================= 输出过滤 =================
+_BLOCK_PATTERNS = [
+    "历史模式", "匹配到", "完全匹配", "让我确认", "让我看看", "让我查",
+    "确认RG_NAME", "确认表结构", "确认列名", "确认项目名称",
+    "查询结果为空，让我", "找到了完全匹配", "我先看看",
+    "我来查一下", "我来确认", "我先确认",
+    "现在来查询数据", "查询结果如下", "查询完成",
+    "执行的SQL", "SQL语句",
+]
+
+def _filter_thoughts(text: str) -> str:
+    for p in _BLOCK_PATTERNS:
+        if p in text: return ""
+    return text
+
 # ================= API =================
 @app.get("/v1/models")
 async def list_models():
@@ -214,6 +229,8 @@ async def dify_chat(request: OpenAIRequest, raw_request: Request):
                 for chunk in agent_runner_loop(client=client, system_prompt=system_prompt, user_input=user_msg,
                                                handler=handler, tools_schema=TOOLS_SCHEMA, max_turns=20, verbose=False):
                     if chunk.strip():
+                        filtered = _filter_thoughts(chunk)
+                        if not filtered: continue
                         delta = {"id":f"chatcmpl-{int(time.time())}","object":"chat.completion.chunk","created":int(time.time()),
                                  "model":request.model,"choices":[{"index":0,"delta":{"content":chunk},"finish_reason":None}]}
                         yield f"data: {json.dumps(delta,ensure_ascii=False)}\n\n"
