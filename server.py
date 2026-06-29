@@ -99,15 +99,25 @@ def _inject_skills(system_prompt: str, question: str) -> str:
     return system_prompt
 
 
-def _inject_guidance(system_prompt: str, question: str) -> str:
+def _inject_guidance(system_prompt: str, question: str, tracer=None) -> str:
     """注入业务指引（指标模板优先，技能文件兜底）"""
-    # Step 1: 尝试匹配业务指标
     budget = _detect_budget_type(question)
     intent = _detect_intent(question)
+
+    # 记录业务决策
+    if tracer:
+        tracer.decision("budget_detect", {"question": question[:80], "detected_budget": budget, "detected_intent": intent})
+
     if budget and intent:
         try:
             from tools.business_loader import load_business_metric
             metric = load_business_metric(budget, intent)
+            if tracer:
+                tracer.decision("metric_match", {
+                    "budget": budget, "intent": intent,
+                    "matched": metric["matched"],
+                    "metric_name": metric["metrics"][0]["name"] if metric["matched"] > 0 else "none"
+                })
             if metric["matched"] > 0:
                 m = metric["metrics"][0]
                 system_prompt += (
@@ -118,12 +128,21 @@ def _inject_guidance(system_prompt: str, question: str) -> str:
                     f"SQL模板: {m['sql_template']}\n"
                     f"【禁止调 search_schema 和 describe_table。直接用上表名写SQL。】\n"
                 )
+                if tracer:
+                    tracer.decision("inject_enforce", {
+                        "type": "metric_forced",
+                        "table": m["table"],
+                        "columns": m["columns"][:6]
+                    })
                 return system_prompt
         except Exception:
             pass
 
-    # Step 2: 无指标匹配时，注入技能文件参考
-    return _inject_skills(system_prompt, question)
+    # 兜底: 注入技能文件
+    result = _inject_skills(system_prompt, question)
+    if tracer:
+        tracer.decision("inject_fallback", {"type": "skills_injected"})
+    return result
 
 
 def _detect_budget_type(question: str) -> str:
@@ -223,7 +242,7 @@ def chat(req: ChatRequest):
 
     client = _build_client()
     system_prompt = _load_system_prompt()
-    system_prompt = _inject_guidance(system_prompt, req.question)
+    system_prompt = _inject_guidance(system_prompt, req.question, tracer)
 
     # L0 元规则（最高优先级，永远生效）
     l0_path = os.path.join(os.path.dirname(__file__), "memory", "L0_meta_rules.md")
@@ -356,7 +375,7 @@ async def chat_stream(req: ChatRequest):
 
     client = _build_client()
     system_prompt = _load_system_prompt()
-    system_prompt = _inject_guidance(system_prompt, req.question)
+    system_prompt = _inject_guidance(system_prompt, req.question, tracer)
 
     # L0 元规则（最高优先级，永远生效）
     l0_path = os.path.join(os.path.dirname(__file__), "memory", "L0_meta_rules.md")

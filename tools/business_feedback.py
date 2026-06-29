@@ -66,23 +66,30 @@ class BusinessFeedback:
 
     # ===== 分析1: 未匹配的查询 =====
     def unmatched_queries(self) -> list:
-        """找出 tracer 中有 explore 步骤但没有业务指标匹配的查询"""
+        """找出 tracer 中走了探索路径或未匹配指标的查询"""
         unmatched = []
         for t in self.traces:
-            steps = [s["step"] for s in t.get("steps", [])]
-            has_explore = any(s in ("search_schema", "describe_table") for s in steps)
-            has_sql = any(s == "run_sql" for s in steps)
+            steps = t.get("steps", [])
+            step_names = [s["step"] for s in steps]
+            has_explore = any(s in ("search_schema", "describe_table") for s in step_names)
+            has_sql = any(s == "run_sql" for s in step_names)
+
+            # 检查 DECISION 记录
+            decisions = {s["step"]: s.get("result", {}) for s in steps if s["step"].startswith("DECISION:")}
+            was_forced = any(d.get("type") == "metric_forced" for d in decisions.values())
+            budget_detected = decisions.get("DECISION:budget_detect", {}).get("detected_budget", "")
+            intent_detected = decisions.get("DECISION:budget_detect", {}).get("detected_intent", "")
+
             q = t.get("question", "")
-            # 检测是否走了探索路径（说明没命中强制执行）
             if has_explore and has_sql:
-                budget = self._detect_budget(q)
-                intent = self._detect_intent(q)
-                if not budget or not intent:
+                if not was_forced:
                     unmatched.append({
                         "question": q[:100],
                         "steps": len(steps),
                         "duration": t.get("total_seconds", 0),
-                        "missing": "budget_type" if not budget else "intent",
+                        "budget_detected": budget_detected or "未识别",
+                        "intent_detected": intent_detected or "未识别",
+                        "had_metric_match": was_forced,
                         "suggested_keywords": self._extract_keywords(q)
                     })
         return unmatched[:10]

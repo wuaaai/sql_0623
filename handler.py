@@ -8,7 +8,7 @@ dispatch(tool_name, args) → do_<tool_name>(args) → StepOutcome
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from tools import db_connection, db_query, db_schema, time_resolver, db_aggregation, db_cross_table, db_advanced, error_handler, pattern_store, memory_core, rag_tool, admin_db
+from tools import db_connection, db_query, db_schema, time_resolver, db_aggregation, db_cross_table, db_advanced, error_handler, pattern_store, memory_core, rag_tool, admin_db, business_loader
 
 
 @dataclass
@@ -23,10 +23,19 @@ class StepOutcome:
 class BaseHandler:
     """基础分发器: 将工具名映射到 do_<tool_name> 方法"""
 
+    def __init__(self):
+        self.tracer = None  # QueryTracer 实例，由 server 注入
+
     def dispatch(self, tool_name: str, args: dict) -> StepOutcome:
+        import time
+        start = time.time()
         method_name = f"do_{tool_name}"
         if hasattr(self, method_name):
-            return getattr(self, method_name)(args)
+            outcome = getattr(self, method_name)(args)
+            elapsed = round(time.time() - start, 2)
+            if self.tracer:
+                self.tracer.step(tool_name, elapsed=f"{elapsed}s", args=str(args)[:100])
+            return outcome
         else:
             return StepOutcome(
                 None,
@@ -89,6 +98,16 @@ class TextToSQLHandler(BaseHandler):
 
     def do_run_sql(self, args: dict) -> StepOutcome:
         sql = args["sql"]
+        # tracer: 记录选表+选列决策
+        if self.tracer:
+            import re
+            table = re.search(r'\bFROM\s+([a-zA-Z_][\w.]*)', sql, re.IGNORECASE)
+            cols = re.findall(r'SELECT\s+(.+?)\s+FROM', sql, re.IGNORECASE | re.DOTALL)
+            self.tracer.decision("sql_execute", {
+                "sql": sql[:200],
+                "table": table.group(1) if table else "unknown",
+                "columns": cols[0][:100] if cols else "unknown"
+            })
         # 管理权限检查：表是否被禁用/是否有地区限制
         allowed, result_or_sql = admin_db.check_table_permission(sql)
         if not allowed:
@@ -442,6 +461,26 @@ class TextToSQLHandler(BaseHandler):
             return StepOutcome(data=result, next_prompt=f"记忆搜索 '{args['keyword']}' 找到{result['matched']}条:\n" + "\n".join(lines))
         return StepOutcome(data=result, next_prompt=f"记忆搜索无结果。总记忆条目: 正常。")
 
+    def do_load_business_metric(self, args: dict) -> StepOutcome:
+        result = business_loader.load_business_metric(
+            budget_type=args.get("budget_type", ""),
+            intent=args.get("intent", "")
+        )
+        if result["matched"] > 0:
+            m = result["metrics"][0]
+            variants = m.get("variants", {})
+            var_desc = "\n".join(f"- {k}: {v}" for k, v in variants.items()) if variants else "无"
+            tmpl = result.get("templates", {})
+            tmpl_desc = "\n".join(f"- {k}: {v[:100]}" for k, v in list(tmpl.items())[:2]) if tmpl else ""
+            return StepOutcome(
+                data=result,
+                next_prompt=f"[业务指标] {m['name']}\n表名: {m['table']}\n列名: {', '.join(m['columns'][:8])}\n"
+                           f"金额列: {m.get('amount_col','')}\n筛选: {', '.join(m.get('default_filters',[]))}\n"
+                           f"变体: {var_desc}\nSQL模板: {tmpl_desc}\n"
+                           f"直接使用表名和列名写SQL，不需要search_schema和describe_table。"
+            )
+        return StepOutcome(data=result, next_prompt=f"未匹配到业务指标。正常探索表结构。")
+
     def do_rag_search(self, args: dict) -> StepOutcome:
         result = rag_tool.rag_search(args["query"])
         if result["status"] == "ok" and result.get("documents"):
@@ -486,3 +525,23 @@ def _format_rows(columns: list, rows: list, max_display: int = 20) -> str:
         lines.append(f"... 还有 {len(rows) - max_display} 行未显示")
 
     return "\n".join(lines)
+
+class ServerHandler(TextToSQLHandler):
+    """服务端 Handler, 额外捕获 SQL 和结果"""
+    def __init__(self):
+        super().__init__()
+        self.captured_sql = None
+        self.captured_columns = None
+        self.captured_rows = None
+        self.captured_table = None
+
+    def do_run_sql(self, args):
+        self.captured_sql = args.get("sql", "")
+        import re
+        m = re.search(r"FROM\s+([a-zA-Z_][\w.]*)", self.captured_sql or "", re.IGNORECASE)
+        if m: self.captured_table = m.group(1)
+        outcome = super().do_run_sql(args)
+        if outcome.data and outcome.data.get("status") == "success":
+            self.captured_columns = outcome.data.get("columns", [])
+            self.captured_rows = outcome.data.get("rows", [])
+        return outcome
