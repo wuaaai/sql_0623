@@ -148,13 +148,7 @@ async def dify_chat(request: OpenAIRequest, raw_request: Request):
 
         # DB连接状态（强制声明，防止LLM重复connect_db）
         system_prompt = f"\n[DB状态] 达梦已连接(schema={config.DB_SCHEMA})。禁止调用connect_db。直接调run_sql。\n"
-        system_prompt += "[输出格式] 展示SQL语句时直接写，不要用markdown代码块(```)。\n"
-
-        # 进度描述规范
-        progress_path = os.path.join(BASE_DIR, "memory", "progress_guide.md")
-        if os.path.exists(progress_path):
-            with open(progress_path, encoding="utf-8") as f:
-                system_prompt += "\n" + f.read() + "\n" + system_prompt
+        system_prompt += "[输出格式] 展示SQL语句时直接写，不要用markdown代码块(```)。\n" + system_prompt
 
         # 工作记忆
         wm = memory_core.load_working_memory()

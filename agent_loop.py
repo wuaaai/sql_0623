@@ -55,8 +55,8 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
 
         # 收集流式响应
         assistant_content = ""
-        tool_call_data = {}  # index -> {id, name, arguments}
-        first_tool_notified = False
+        tool_call_data = {}
+        tool_notify_count = 0  # 通知计数，最多3次
         for chunk in stream:
             delta = chunk.choices[0].delta if chunk.choices else None
             if delta is None:
@@ -78,9 +78,9 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
                             tool_call_data[idx]["name"] += tc.function.name
                         if tc.function.arguments:
                             tool_call_data[idx]["arguments"] += tc.function.arguments
-                # 首次检测到工具调用时，发送进度通知
-                if not first_tool_notified and tool_call_data:
-                    first_tool_notified = True
+                # 检测到工具调用时通知（最多3次）
+                if tool_notify_count < 3 and tool_call_data:
+                    tool_notify_count += 1
                     tool_names = [td["name"] for td in tool_call_data.values() if td["name"]]
                     if any("rag" in n.lower() or "search" in n.lower() for n in tool_names):
                         yield "\n> 正在检索知识库，请稍候...\n\n"
