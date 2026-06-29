@@ -6,15 +6,14 @@ Rerank: POST http://10.32.10.160:8991/rerank?query=xxx (本地格式)
 向量存储: PostgreSQL + Vastbase FloatVector
 """
 
-import os
-import requests
+import os, requests
 from typing import List
+from tools.config import config
 
-# 配置（统一从 .env 读取）
-EMBEDDING_URL = os.environ["RAG_EMBEDDING_URL"]
-RERANK_URL = os.environ["RAG_RERANK_URL"]
-DB_CONNECTION = os.environ["RAG_DB_CONNECTION"]
-COLLECTION_NAME = os.environ.get("RAG_COLLECTION", "parent_child_db_1024")
+EMBEDDING_URL = config.RAG_EMBEDDING_URL
+RERANK_URL = config.RAG_RERANK_URL
+DB_CONNECTION = config.RAG_DB_CONNECTION
+COLLECTION_NAME = config.RAG_COLLECTION
 
 _rag_initialized = False
 _vector_store = None

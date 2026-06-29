@@ -37,6 +37,7 @@ from openai import OpenAI
 from agent_loop import agent_runner_loop
 from tools.schema import TOOLS_SCHEMA
 from tools import db_connection, db_query, pattern_store, memory_core, admin_db
+from tools.config import config
 
 
 # ==== 请求/响应模型 ====
@@ -79,11 +80,8 @@ def _load_system_prompt() -> str:
 
 def _build_client():
     """从环境变量创建 OpenAI 客户端"""
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
-    model = os.environ.get("OPENAI_MODEL", "gpt-4o")
-    client = OpenAI(api_key=api_key, base_url=base_url)
-    client.model = model
+    client = OpenAI(api_key=config.OPENAI_API_KEY, base_url=config.OPENAI_BASE_URL)
+    client.model = config.OPENAI_MODEL
     return client
 
 
@@ -559,14 +557,14 @@ def main():
     # 启动时自动连接数据库
     try:
         db_connection.connect_db(
-            db_type=os.environ["DB_TYPE"],
-            host=os.environ["DB_HOST"],
-            port=int(os.environ["DB_PORT"]),
-            user=os.environ["DB_USER"],
-            password=os.environ["DB_PASSWORD"],
-            schema=os.environ["DB_SCHEMA"]
+            db_type=config.DB_TYPE,
+            host=config.DB_HOST,
+            port=config.DB_PORT,
+            user=config.DB_USER,
+            password=config.DB_PASSWORD,
+            schema=config.DB_SCHEMA
         )
-        print(f"[启动] 已自动连接数据库 {os.environ['DB_SCHEMA']}")
+        print(f"[启动] 已自动连接数据库 {config.DB_SCHEMA}")
     except Exception as e:
         print(f"[启动] 数据库自动连接失败: {e}")
     # 初始化管理数据库（依赖达梦连接）

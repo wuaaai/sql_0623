@@ -8,10 +8,11 @@ Usage: uv run python tools/rag_ingest.py
 import os, sys, json, hashlib, requests
 from typing import List
 from docx import Document as DocxDocument
+from tools.config import config
 
-EMBEDDING_URL = os.environ["RAG_EMBEDDING_URL"]
-DB_CONNECTION = os.environ["RAG_DB_CONNECTION"]
-COLLECTION_NAME = os.environ.get("RAG_COLLECTION", "parent_child_db_1024")
+EMBEDDING_URL = config.RAG_EMBEDDING_URL
+DB_CONNECTION = config.RAG_DB_CONNECTION
+COLLECTION_NAME = config.RAG_COLLECTION
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 IMAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "images")
 MAPPING_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Langchain (2)", "src", "agent", "db", "region_mapping.json")

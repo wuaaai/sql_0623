@@ -121,8 +121,9 @@ def _auto_import_tables(db):
 def _auto_import_documents(db):
     """从pgvector自动导入文档列表"""
     try:
-        db_conn_str = os.environ.get("RAG_DB_CONNECTION", "postgresql+psycopg2://postgres:ROOT@127.0.0.1:5432/postgres")
-        coll = os.environ.get("RAG_COLLECTION", "parent_child_db_1024")
+        from tools.config import config
+        db_conn_str = config.RAG_DB_CONNECTION
+        coll = config.RAG_COLLECTION
         from sqlalchemy import create_engine, text as sql_text
         engine = create_engine(db_conn_str)
         with engine.connect() as conn:

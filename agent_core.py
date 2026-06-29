@@ -6,6 +6,7 @@ Agent 核心类
 
 import os
 from openai import OpenAI
+from tools.config import config
 
 from agent_loop import agent_runner_loop
 from handler import TextToSQLHandler
@@ -25,9 +26,9 @@ class TextToSQLAgent:
     """Text-to-SQL Agent"""
 
     def __init__(self, api_key: str = None, base_url: str = None, model: str = None):
-        self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
-        self.base_url = base_url or os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
-        self.model = model or os.environ.get("OPENAI_MODEL", "gpt-4o")
+        self.api_key = api_key or config.OPENAI_API_KEY
+        self.base_url = base_url or config.OPENAI_BASE_URL
+        self.model = model or config.OPENAI_MODEL
 
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
         self.client.model = self.model
