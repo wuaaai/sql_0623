@@ -7,81 +7,33 @@
 
 ## 数据库概况
 - Schema: RDYS_PUBLIC_TBS，共47张表
+- 预算类型和列名模式: 参见 memory/business_rules.json
 
-## 四大预算类型 → 表名前缀映射
+## 重要: 市县数据查XM_NAME而非RG_NAME
+RG_NAME 固定为"河北省"或"河北省本级"——是省级汇总。
+市县数据在 XM_NAME 列中，例如"衡水市""赞皇县""石家庄市本级"。
+查某市县: WHERE XM_NAME LIKE '%衡水市%'
+查各区县: WHERE XM_NAME LIKE '%县%'
 
-| 用户口语 | 表名前缀 | 数量 |
-|----------|----------|------|
-| 一般公共预算 | YBGGYS | 7张 |
-| 社会保险/社保基金 | SHBXJJ | 7张 |
-| 国有资本/国资预算 | GYZBJY | 7张 |
-| 政府性基金 | ZFXJJ | 4张 |
-
-## 预算表通用字段
-
-| 字段 | 含义 |
-|------|------|
-| RG_CODE / RG_NAME | 地区编码/名称 |
-| YEAR_MONTH | 年月 (格式: 202001) |
-| XM_CODE / XM_NAME | 项目编码/名称 |
-| YSS | 预算数 |
-| BYS_JE / BY_JE | 本月金额 |
-| BYS_SNTYS / BY_SNTYS | 上年同期金额 |
-| BYS_TBE / BY_TBE | 同比增减额 |
-| BYS_TBB / BY_TBBFS | 同比增减率(%) |
-| BYLJS_JE | 本月累计金额 |
-
-**列名变体**: BYS_JE vs BY_JE, BYS_SNTYS vs BY_SNTYS, BYS_TBB vs BY_TBBFS — 用 describe_table 确认具体表的列名。
-
-## 地区编码
-- 130000000: 河北省本级
-- RG_NAME LIKE '%本级%': 省级数据
-- RG_NAME NOT LIKE '%本级%': 各地市
-
-## 项目名称常见值
-- "合    计" / "合计" / "一、收入合计"
-- "一、税收收入" / "二、非税收入"
-
-## 跨表关联知识
-
-### 四类预算表同构
-- 一般公共预算(YBGGYS)/社保(SHBXJJ)/国资(GYZBJY)/政府性基金(ZFXJJ)的收入表结构相同
-- 支出表也结构相同
-- 共享18+公共列: RG_CODE, RG_NAME, YEAR_MONTH, DEPT_CODE, DEPT_NAME, XM_CODE, XM_NAME 等
-- 可直接 UNION ALL 合并后统一聚合排名
-
-### 字典表关联键
-- RDYS_BAS_EXPFUNC(支出分类): EXP_FUNC_CODE → 执行表
-- RDYS_BAS_MOFDIV(地区划分): MOF_DIV_CODE → 执行表
-- RDYS_BAS_INCOMESORT(收入分类): INCOMESORT_CODE → 执行表
-- 使用 find_relations 工具发现两表的关联键
+## 排名查询
+- 查"各市排名"直接用预算表: SELECT RG_NAME, BYS_JE FROM table WHERE ... ORDER BY BYS_JE DESC
+- 不需要 GROUP BY，每行已是一个地区的数据，直接 ORDER BY + ROWNUM 即可
 
 ## 窗口函数语法（达梦支持）
 - SUM(col) OVER(): 窗口合计（占比分母）
 - LAG(col, n) OVER (PARTITION BY x ORDER BY y): 前n行值（环比）
-- RANK() OVER(): 排名 | PERCENT_RANK(): 百分位排名
-- NTILE(n) OVER(): 分n档
 - AVG/STDDEV OVER(): 窗口均值/标准差（异常检测）
 
 ## 异常检测阈值
 - threshold=2.0: 常规(95%置信区间外)
 - threshold=3.0: 极端(99.7%外)，用于重大发现汇报
 
+## 跨表关联知识
+### 字典表关联键
+- RDYS_BAS_EXPFUNC(支出分类): EXP_FUNC_CODE → 执行表
+- RDYS_BAS_MOFDIV(地区划分): MOF_DIV_CODE → 执行表
+- 使用 find_relations 工具发现两表的关联键
 ### 跨表查询策略
 - 对比 → 分别查两张表 + LLM综合
 - 合并排名 → union_query 或 run_sql(UNION ALL)
 - 字典关联 → find_relations → run_sql(JOIN)
-
-
-## 排名查询
-- 一般公共预算有排名表 RDYS_LD_YSZX_YBGGYS_SZPMQK（全国各省排名，非省内各市）
-- 查"各市排名"直接用预算表: SELECT RG_NAME, BYS_JE FROM table WHERE ... ORDER BY BYS_JE DESC
-- 不需要 GROUP BY，每行已是一个地区的数据，直接 ORDER BY + ROWNUM 即可
-
-## 重要: 市县数据查XM_NAME而非RG_NAME
-
-**RG_NAME 固定为"河北省"或"河北省本级"——是省级汇总。**
-**市县数据在 XM_NAME 列中**，例如"衡水市""赞皇县""石家庄市本级"。
-查某市县: `WHERE XM_NAME LIKE '%衡水市%'`
-查各区县: `WHERE XM_NAME LIKE '%县%'`
-查各地市(排除合计): `WHERE XM_NAME NOT LIKE '%合计%'`

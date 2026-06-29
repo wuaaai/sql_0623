@@ -1,0 +1,46 @@
+{
+  "budget_types": {
+    "一般公共预算": {
+      "prefix": "YBGGYS", "aliases": ["一般预算", "公共预算", "YB"],
+      "income_tables": ["RDYS_LD_YSSC_YSZX_QSYBGGYSSRWC"],
+      "expenditure_tables": ["RDYS_LD_YSSC_YSZX_QSYBGGYSZCWC"],
+      "description": "一般公共预算收入/支出执行数据"
+    },
+    "社会保险": {
+      "prefix": "SHBXJJ", "aliases": ["社保", "社保基金", "保险"],
+      "income_tables": ["RDYS_LD_YSZX_SHBXJJYSSRWC"],
+      "expenditure_tables": ["RDYS_LD_YSZX_SHBXJJYSZCWC"],
+      "description": "社会保险基金收入/支出执行数据"
+    },
+    "国有资本": {
+      "prefix": "GYZBJY", "aliases": ["国资", "国资预算", "国有资本经营"],
+      "income_tables": ["RDYS_LD_YSZX_GYZBJYYYSRWC"],
+      "expenditure_tables": ["RDYS_LD_YSZX_GYZBJYYYZCWC"],
+      "description": "国有资本经营预算收入/支出执行数据"
+    },
+    "政府性基金": {
+      "prefix": "ZFXJJ", "aliases": ["政府基金", "基金预算"],
+      "income_tables": ["RDYS_LD_YSZX_ZFXJJ_QSSRWCQK"],
+      "expenditure_tables": ["RDYS_LD_YSZX_ZFXJJ_SBJZCWCQK"],
+      "description": "政府性基金预算收入/支出执行数据"
+    }
+  },
+  "column_patterns": {
+    "完成情况": {"keywords": ["完成","收入","支出","执行"],"columns": ["RG_NAME","YEAR_MONTH","XM_NAME","YSS","BYS_JE","BY_JE","BYLJS_JE"]},
+    "同比对比": {"keywords": ["同比","增长","下降","去年","增减"],"columns": ["BYS_SNTYS","BY_SNTYS","BYS_TBE","BY_TBE","BYS_TBB","BY_TBBFS"]},
+    "排名": {"keywords": ["排名","最高","最低","前","TOP"],"columns": ["RG_NAME","YEAR_MONTH","XM_NAME","BYS_JE","BY_JE"]},
+    "预算执行": {"keywords": ["预算执行","进度","完成率"],"columns": ["RG_NAME","YSS","BYS_JE","BY_JE","BYLJS_JE"]}
+  },
+  "region_codes": {
+    "130000000":"河北省","130100000":"石家庄市","130200000":"唐山市","130300000":"秦皇岛市",
+    "130400000":"邯郸市","130500000":"邢台市","130600000":"保定市","130700000":"张家口市",
+    "130800000":"承德市","130900000":"沧州市","131000000":"廊坊市","131100000":"衡水市"
+  },
+  "common_filters": {
+    "合计": "XM_NAME LIKE '%合%计%'",
+    "税收": "XM_NAME LIKE '%税收%'",
+    "非税": "XM_NAME LIKE '%非税%'",
+    "省本级": "RG_NAME LIKE '%本级%'",
+    "各地市": "RG_NAME NOT LIKE '%本级%'"
+  }
+}

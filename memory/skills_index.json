@@ -1,0 +1,14 @@
+{
+  "skills": [
+    {"file": "aggregation.md", "triggers": ["排名", "各市", "各月", "平均", "汇总", "趋势", "GROUP BY"], "priority": 1},
+    {"file": "yoy_analysis.md", "triggers": ["同比", "增长", "下降", "去年", "同期", "增减"], "priority": 1},
+    {"file": "advanced_analysis.md", "triggers": ["占比", "子查询", "异常", "超过平均", "环比"], "priority": 1},
+    {"file": "cross_table_analysis.md", "triggers": ["对比", "合并", "UNION", "关联", "跨表"], "priority": 2},
+    {"file": "sql_generation.md", "triggers": ["SQL", "达梦", "ROWNUM", "JOIN", "WHERE"], "priority": 2},
+    {"file": "schema_exploration.md", "triggers": ["有哪些表", "表结构", "搜索表", "查找表"], "priority": 2},
+    {"file": "budget_progress.md", "triggers": ["进度", "完成率", "执行率", "预算执行"], "priority": 2},
+    {"file": "query_efficiency.md", "triggers": ["高效", "优化", "轮次", "合并"], "priority": 3},
+    {"file": "interaction_patterns.md", "triggers": ["追问", "上下文", "交互"], "priority": 3},
+    {"file": "error_recovery.md", "triggers": [], "priority": 3, "note": "由 error_handler 内部引用"}
+  ]
+}

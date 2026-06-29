@@ -7,32 +7,32 @@ suggest_columns: 根据用户意图智能推荐列名
 """
 
 from tools import db_connection as _db
+import json, os
 
 # 进程级缓存：同表不重复查结构
 _desc_cache: dict = {}
 
-# 预算类型→英文缩写映射，用于 search_schema 自动扩展
-BUDGET_TYPE_MAP = {
-    "一般公共预算": "YBGGYS",
-    "一般预算": "YBGGYS",
-    "公共预算": "YBGGYS",
-    "社会保险": "SHBXJJ",
-    "社保基金": "SHBXJJ",
-    "社保": "SHBXJJ",
-    "国有资本": "GYZBJY",
-    "国资预算": "GYZBJY",
-    "国资": "GYZBJY",
-    "政府性基金": "ZFXJJ",
-    "政府基金": "ZFXJJ",
-}
+# 从 business_rules.json 加载预算类型和列名模式
+def _load_rules():
+    path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "memory", "business_rules.json")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    return {"budget_types": {}, "column_patterns": {}, "region_codes": {}, "common_filters": {}}
 
-# 用户意图→推荐列名模式
-INTENT_COLUMN_PATTERNS = {
-    "完成情况": ["RG_NAME", "YEAR_MONTH", "XM_NAME", "YSS", "BYS_JE", "BY_JE", "BYLJS_JE"],
-    "同比": ["BYS_JE", "BY_JE", "BYS_SNTYS", "BY_SNTYS", "BYS_TBE", "BY_TBE", "BYS_TBB", "BY_TBBFS"],
-    "排名": ["RG_NAME", "YEAR_MONTH", "XM_NAME", "BYS_JE", "BY_JE", "BYS_TBB", "BY_TBBFS"],
-    "预算执行": ["RG_NAME", "YSS", "BYS_JE", "BY_JE", "BYLJS_JE"],
-}
+_rules = _load_rules()
+
+# 预算类型→英文缩写映射（从JSON构建）
+BUDGET_TYPE_MAP = {}
+for _name, _info in _rules.get("budget_types", {}).items():
+    BUDGET_TYPE_MAP[_name] = _info["prefix"]
+    for _alias in _info.get("aliases", []):
+        BUDGET_TYPE_MAP[_alias] = _info["prefix"]
+
+# 用户意图→推荐列名模式（从JSON构建）
+INTENT_COLUMN_PATTERNS = {}
+for _name, _info in _rules.get("column_patterns", {}).items():
+    INTENT_COLUMN_PATTERNS[_name] = _info.get("columns", [])
 
 
 def _find_budget_abbr(keyword: str) -> str:

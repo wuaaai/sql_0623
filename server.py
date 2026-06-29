@@ -70,6 +70,41 @@ class ChatResponse(BaseModel):
 app = FastAPI(title="Text-to-SQL Agent", version="0.1.0")
 
 
+def _inject_skills(system_prompt: str, question: str) -> str:
+    """根据用户问题关键词匹配技能文件，注入到 system_prompt"""
+    index_path = os.path.join(os.path.dirname(__file__), "memory", "skills_index.json")
+    if not os.path.exists(index_path):
+        return system_prompt
+    try:
+        with open(index_path, encoding="utf-8") as f:
+            index = json.load(f)
+    except Exception:
+        return system_prompt
+
+    skills_dir = os.path.join(os.path.dirname(__file__), "memory", "skills")
+    matched = []
+    for skill in index.get("skills", []):
+        if skill.get("priority", 1) > 2:
+            continue
+        for trigger in skill.get("triggers", []):
+            if trigger in question:
+                matched.append(skill)
+                break
+
+    if matched:
+        system_prompt += "\n\n## 相关业务知识\n"
+        for s in sorted(matched, key=lambda x: x.get("priority", 1)):
+            skill_path = os.path.join(skills_dir, s["file"])
+            if os.path.exists(skill_path):
+                try:
+                    with open(skill_path, encoding="utf-8") as f:
+                        system_prompt += f"\n### {s['file']}\n{f.read()[:600]}\n"
+                except Exception:
+                    pass
+
+    return system_prompt
+
+
 def _load_system_prompt() -> str:
     prompt_path = os.path.join(os.path.dirname(__file__), "prompts", "system_prompt.txt")
     if os.path.exists(prompt_path):
@@ -152,6 +187,7 @@ def chat(req: ChatRequest):
 
     client = _build_client()
     system_prompt = _load_system_prompt()
+    system_prompt = _inject_skills(system_prompt, req.question)
 
     # L0 元规则（最高优先级，永远生效）
     l0_path = os.path.join(os.path.dirname(__file__), "memory", "L0_meta_rules.md")
@@ -222,6 +258,12 @@ def chat(req: ChatRequest):
     handler = ServerHandler()
     handler.current_question = req.question
 
+    # 链路追踪
+    import uuid
+    from tools.tracer import QueryTracer
+    tracer = QueryTracer(str(uuid.uuid4()), req.question)
+    handler.tracer = tracer
+
     # 在用户消息前注入工具调用指令，防止 LLM 跳过工具直接编造
     user_msg = f"[强制] 你必须调用工具(run_sql/describe_table)获取真实数据后回答。禁止编造、禁止说'连接失败'。数据库已连接正常。\n用户问题: {req.question}"
 
@@ -255,6 +297,9 @@ def chat(req: ChatRequest):
     except Exception:
         pass
 
+    # 链路追踪完成
+    tracer.done(sql=handler.captured_sql or "", rows=len(handler.captured_rows or []))
+
     # 自动保存查询历史
     _append_history(req.question, handler.captured_sql or "")
 
@@ -275,6 +320,7 @@ async def chat_stream(req: ChatRequest):
 
     client = _build_client()
     system_prompt = _load_system_prompt()
+    system_prompt = _inject_skills(system_prompt, req.question)
 
     # L0 元规则（最高优先级，永远生效）
     l0_path = os.path.join(os.path.dirname(__file__), "memory", "L0_meta_rules.md")
@@ -328,6 +374,12 @@ async def chat_stream(req: ChatRequest):
     handler = ServerHandler()
     handler.current_question = req.question
 
+    # 链路追踪(流式)
+    import uuid as _uuid
+    from tools.tracer import QueryTracer as _QT
+    _tracer = _QT(str(_uuid.uuid4()), req.question)
+    handler.tracer = _tracer
+
     user_msg = f"[强制] 你必须调用工具(run_sql/describe_table)获取真实数据后回答。禁止编造、禁止说'连接失败'。数据库已连接正常。\n用户问题: {req.question}"
 
     async def generate():
@@ -346,6 +398,9 @@ async def chat_stream(req: ChatRequest):
             elif chunk.strip():
                 yield f"data: {json.dumps({'type': 'text', 'text': chunk}, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0)
+
+        # 链路追踪完成
+        _tracer.done(sql=handler.captured_sql or "", rows=len(handler.captured_rows or []))
 
         # 自动保存查询历史
         _append_history(req.question, handler.captured_sql or "")
