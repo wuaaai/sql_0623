@@ -320,5 +320,20 @@ TOOLS_SCHEMA = [
                 "required": ["query"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "load_business_metric",
+            "description": "加载业务指标模板。返回匹配的表名、列名、SQL模板和变体。当用户问题匹配已知业务场景时优先使用此工具，避免重复探索表结构。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "budget_type": {"type": "string", "description": "预算类型: 一般公共预算/社会保险/国有资本/政府性基金"},
+                    "intent": {"type": "string", "description": "查询意图: 完成情况/同比对比/排名/预算执行"}
+                },
+                "required": []
+            }
+        }
     }
 ]
