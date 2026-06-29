@@ -108,15 +108,26 @@ class BusinessFeedback:
         return ""
 
     def _extract_keywords(self, q):
-        """从问题中提取关键词，用于建议添加到 column_patterns 的 keywords"""
+        """从问题中提取有意义的关键词候选"""
+        import re
+        # 移除数字和标点
+        cleaned = re.sub(r'[\d年月日时分秒，。？?,.\s]', ' ', q)
+        parts = cleaned.split()
+        # 取2-6字的片段，过滤掉短碎片
         existing = set()
         for info in self.rules.get("column_patterns", {}).values():
             for kw in info.get("keywords", []):
                 existing.add(kw)
-        # 简单提取: 2-4字的中文词组
-        import re
-        words = re.findall(r'[一-鿿]{2,4}', q)
-        return [w for w in words if w not in existing][:5]
+        # 只提取不在现有关键字中的
+        candidates = [p.strip() for p in parts if 2 <= len(p.strip()) <= 6 and p.strip() not in existing]
+        # 去重保留前5个
+        seen = set()
+        result = []
+        for c in candidates:
+            if c not in seen:
+                seen.add(c)
+                result.append(c)
+        return result[:5]
 
     # ===== 分析2: 高频查询模式 =====
     def frequent_patterns(self) -> list:
