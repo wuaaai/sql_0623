@@ -8,3 +8,4 @@ temp/
 .env
 query_patterns/
 data/
+admin/node_modules/
