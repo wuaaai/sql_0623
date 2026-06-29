@@ -23,7 +23,9 @@ class QueryTracer:
         elapsed = round(time.time() - self.start_time, 2)
         entry = {"step": name, "elapsed": elapsed, **kwargs}
         self.steps.append(entry)
-        self._log(name, elapsed=f"{elapsed}s", **kwargs)
+        # 避免 kwargs 中的 elapsed 与 _log 参数冲突
+        log_kwargs = {k: v for k, v in kwargs.items() if k != "elapsed"}
+        self._log(name, elapsed=f"{elapsed}s", **log_kwargs)
 
     def done(self, turns: int = 0, sql: str = "", rows: int = 0):
         total = round(time.time() - self.start_time, 2)
