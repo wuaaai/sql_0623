@@ -375,11 +375,6 @@ async def chat_stream(req: ChatRequest):
 
     client = _build_client()
     system_prompt = _load_system_prompt()
-    import uuid as _uuid
-    from tools.tracer import QueryTracer as _QT
-    _tracer = _QT(str(_uuid.uuid4()), req.question)
-    handler.tracer = _tracer
-    system_prompt = _inject_guidance(system_prompt, req.question, _tracer)
 
     # L0 元规则（最高优先级，永远生效）
     l0_path = os.path.join(os.path.dirname(__file__), "memory", "L0_meta_rules.md")
@@ -432,6 +427,10 @@ async def chat_stream(req: ChatRequest):
 
     handler = ServerHandler()
     handler.current_question = req.question
+    import uuid as _uuid2
+    from tools.tracer import QueryTracer as _QT2
+    _tracer = _QT2(str(_uuid2.uuid4()), req.question)
+    handler.tracer = _tracer
 
     # 链路追踪(流式)
     import uuid as _uuid
