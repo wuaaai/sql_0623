@@ -119,13 +119,20 @@ def health():
 @app.post("/v1/chat/completions")
 async def dify_chat(request: OpenAIRequest, raw_request: Request):
     try:
-        # Dify 系统变量
         raw_body = await raw_request.json()
         conversation_id = raw_body.get("sys.conversation_id", str(uuid.uuid4()))
 
-        # 提取地区码
         region_code, cleaned_q = _extract_region(request.messages)
         question = cleaned_q or next((m.content for m in reversed(request.messages) if m.role == "user"), "")
+
+        # Dify 凭据验证: 短测试消息直接返回，避免走完整 agent 流程
+        if len(question) < 10 and question.lower() in ("ping", "hello", "hi", "test", "你好", "测试", ""):
+            return {
+                "id": f"chatcmpl-{int(time.time())}", "object": "chat.completion",
+                "created": int(time.time()), "model": request.model,
+                "choices": [{"message": {"role": "assistant", "content": "连接成功！我是预算助手，可以查询数据库和知识库。"}, "finish_reason": "stop"}]
+            }
+
         print(f"[Dify] conv={conversation_id[:8]} q={question[:80]}")
 
         # ===== 完整 system_prompt 构建 =====
