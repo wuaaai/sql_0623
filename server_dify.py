@@ -125,8 +125,9 @@ async def dify_chat(request: OpenAIRequest, raw_request: Request):
         region_code, cleaned_q = _extract_region(request.messages)
         question = cleaned_q or next((m.content for m in reversed(request.messages) if m.role == "user"), "")
 
-        # Dify 凭据验证: 短测试消息直接返回，避免走完整 agent 流程
-        if len(question) < 10 and question.lower() in ("ping", "hello", "hi", "test", "你好", "测试", ""):
+        # Dify 凭据验证/短测试: 直接返回，不浪费agent调用
+        is_cred_test = len(question) <= 10 or question.lower() in ("ping", "hello", "hi", "test", "你好", "测试", "help", "")
+        if is_cred_test:
             return {
                 "id": f"chatcmpl-{int(time.time())}", "object": "chat.completion",
                 "created": int(time.time()), "model": request.model,
@@ -144,6 +145,9 @@ async def dify_chat(request: OpenAIRequest, raw_request: Request):
         if os.path.exists(l0_path):
             with open(l0_path, encoding="utf-8") as f:
                 system_prompt = f.read() + "\n\n" + system_prompt
+
+        # DB连接状态（强制声明，防止LLM重复connect_db）
+        system_prompt = f"\n[DB状态] 达梦已连接(schema={config.DB_SCHEMA})。禁止调用connect_db。直接调run_sql。\n" + system_prompt
 
         # 工作记忆
         wm = memory_core.load_working_memory()
