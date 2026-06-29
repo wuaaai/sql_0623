@@ -38,7 +38,8 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
 
     turn = 0
     final_answer = ""
-    tool_notify_count = 0  # 跨轮次全局计数，最多通知3次
+    tool_notify_count = 0
+    _query_start_notified = False
 
     while turn < max_turns:
         turn += 1
@@ -78,36 +79,10 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
                             tool_call_data[idx]["name"] += tc.function.name
                         if tc.function.arguments:
                             tool_call_data[idx]["arguments"] += tc.function.arguments
-                # 检测到工具调用时通知（最多3次，按工具类型变化）
-                if tool_notify_count < 3 and tool_call_data:
-                    tool_notify_count += 1
-                    tool_names = [td["name"] for td in tool_call_data.values() if td["name"]]
-
-                    # 按工具类型选择通知文案
-                    msgs = {
-                        "search_schema": "正在查找相关数据表...",
-                        "describe_table": "正在查看表结构...",
-                        "run_sql": f"正在查询数据..." if tool_notify_count <= 2 else "正在获取最终结果...",
-                        "run_aggregation": "正在汇总统计数据...",
-                        "rag_search": "正在检索知识库...",
-                        "resolve_time": "正在解析时间条件...",
-                        "find_relations": "正在分析表关联...",
-                        "union_query": "正在合并多表数据...",
-                        "calc_ratio": "正在计算占比...",
-                        "detect_anomalies": "正在检测异常数据...",
-                        "run_subquery": "正在执行对比分析...",
-                    }
-                    # 取第一个匹配的文案，默认通用
-                    msg = None
-                    for tn in tool_names:
-                        if tn in msgs:
-                            msg = msgs[tn]; break
-                    if not msg:
-                        if any("rag" in n.lower() for n in tool_names):
-                            msg = "正在检索知识库..."
-                        else:
-                            msg = "正在处理数据..."
-                    yield f"\n> {msg}\n\n"
+                # 首次工具调用时发一条通知，后续不再发
+                if not _query_start_notified and tool_call_data:
+                    _query_start_notified = True
+                    yield "\n> 正在处理您的请求...\n\n"
 
         # 没有工具调用 → LLM 给出了最终回答
         if not tool_call_data:
