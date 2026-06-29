@@ -43,18 +43,25 @@ class BusinessFeedback:
         return {}
 
     def _load_metrics(self):
-        metrics = {"total_metrics": 0, "coverage": defaultdict(list)}
+        metrics = {"total_metrics": 0, "coverage": defaultdict(set)}
+        # 文件名→中文名映射
+        name_map = {
+            "general_public": "一般公共预算", "social_insurance": "社会保险",
+            "state_capital": "国有资本", "gov_fund": "政府性基金"
+        }
         for f in os.listdir(METRICS_DIR):
             if f.endswith(".json") and f != "index.json" and f != "templates.json":
                 data = self._load_json(os.path.join(METRICS_DIR, f))
+                budget_name = name_map.get(f.replace(".json", ""), f.replace(".json", ""))
                 for m in data.get("metrics", []):
                     metrics["total_metrics"] += 1
-                    budget = f.replace(".json", "")
-                    for intent_name in self.rules.get("column_patterns", {}):
-                        keywords = self.rules["column_patterns"][intent_name]["keywords"]
-                        for kw in keywords:
-                            if kw in m.get("name", "") or intent_name in str(m.get("variants", {})):
-                                metrics["coverage"][intent_name].append(budget)
+                    # 记录这个指标的直接 intent
+                    metrics["coverage"][m.get("intent", "")].add(budget_name)
+                    # 记录变体覆盖的 intent
+                    for v_name in m.get("variants", {}):
+                        for intent_name, info in self.rules.get("column_patterns", {}).items():
+                            if v_name == intent_name or any(kw in v_name for kw in info.get("keywords", [])):
+                                metrics["coverage"][intent_name].add(budget_name)
         return metrics
 
     # ===== 分析1: 未匹配的查询 =====
@@ -163,18 +170,16 @@ class BusinessFeedback:
 
     # ===== 分析5: 指标覆盖缺口 =====
     def coverage_gaps(self) -> list:
-        """发现 column_patterns 和 metrics 之间的覆盖缺口"""
         gaps = []
         for intent_name, info in self.rules.get("column_patterns", {}).items():
-            covered = self.metrics.get("coverage", {}).get(intent_name, [])
-            all_budgets = ["一般公共预算", "社会保险", "国有资本", "政府性基金"]
+            covered = self.metrics.get("coverage", {}).get(intent_name, set())
+            all_budgets = {"一般公共预算", "社会保险", "国有资本", "政府性基金"}
             missing = [b for b in all_budgets if b not in covered]
             if missing:
                 gaps.append({
                     "intent": intent_name,
-                    "covered_budgets": covered,
-                    "missing_budgets": missing,
-                    "suggestion": f"为 {', '.join(missing)} 添加 {intent_name} 指标"
+                    "covered": list(covered),
+                    "missing": missing
                 })
         return gaps
 
@@ -201,8 +206,8 @@ class BusinessFeedback:
             suggestions.append({
                 "type": "add_metric",
                 "priority": "high",
-                "action": gap["suggestion"],
-                "detail": f"为 {', '.join(gap['missing_budgets'])} 的 {gap['intent']} 场景创建指标模板"
+                "action": f"为 {', '.join(gap['missing'])} 添加 {gap['intent']} 指标",
+                "detail": f"当前覆盖: {', '.join(gap['covered']) if gap['covered'] else '无'}, 缺失: {', '.join(gap['missing'])}"
             })
 
         # 2. 未匹配查询 → 建议加关键词
