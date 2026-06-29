@@ -375,6 +375,10 @@ async def chat_stream(req: ChatRequest):
 
     client = _build_client()
     system_prompt = _load_system_prompt()
+    import uuid as _uuid
+    from tools.tracer import QueryTracer as _QT
+    _tracer = _QT(str(_uuid.uuid4()), req.question)
+    handler.tracer = _tracer
     system_prompt = _inject_guidance(system_prompt, req.question, _tracer)
 
     # L0 元规则（最高优先级，永远生效）
@@ -431,9 +435,6 @@ async def chat_stream(req: ChatRequest):
 
     # 链路追踪(流式)
     import uuid as _uuid
-    from tools.tracer import QueryTracer as _QT
-    _tracer = _QT(str(_uuid.uuid4()), req.question)
-    handler.tracer = _tracer
 
     user_msg = f"[强制] 你必须调用工具(run_sql/describe_table)获取真实数据后回答。禁止编造、禁止说'连接失败'。数据库已连接正常。\n用户问题: {req.question}"
 
