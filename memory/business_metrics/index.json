@@ -1,0 +1,14 @@
+{
+  "budget_type_mapping": {
+    "一般公共预算": "general_public.json",
+    "社会保险": "social_insurance.json",
+    "国有资本": "state_capital.json",
+    "政府性基金": "gov_fund.json"
+  },
+  "intent_mapping": {
+    "完成情况": ["general_public.json","social_insurance.json","state_capital.json","gov_fund.json"],
+    "同比对比": ["general_public.json","social_insurance.json","state_capital.json","gov_fund.json"],
+    "排名": ["general_public.json","social_insurance.json","state_capital.json","gov_fund.json"],
+    "预算执行": ["general_public.json","social_insurance.json","state_capital.json","gov_fund.json"]
+  }
+}

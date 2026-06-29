@@ -1,0 +1,8 @@
+{
+  "templates": {
+    "ranking": "SELECT * FROM (SELECT {columns}, {aggregate} as total FROM {table} WHERE {filters} GROUP BY {group_by} ORDER BY total {order}) WHERE ROWNUM <= {limit}",
+    "trend": "SELECT {group_by}, {aggregate} as total FROM {table} WHERE {filters} GROUP BY {group_by} ORDER BY {group_by} {order}",
+    "detail": "SELECT {columns} FROM {table} WHERE {filters} AND ROWNUM <= {limit}",
+    "summary": "SELECT {aggregate} as total FROM {table} WHERE {filters}"
+  }
+}

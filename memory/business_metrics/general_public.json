@@ -11,7 +11,8 @@
         "排名": {"group_by":"RG_NAME","aggregate":"SUM({amount_col})","order":"DESC","limit":20},
         "趋势": {"group_by":"YEAR_MONTH","aggregate":"SUM({amount_col})","order":"ASC"},
         "同比": {"columns_add":["BYS_SNTYS","BYS_TBE","BYS_TBB"]},
-        "累计": {"amount_col":"BYLJS_JE"}
+        "累计": {"amount_col":"BYLJS_JE"},
+        "预算执行": {"columns_add":["YSS","BYLJS_JE"]}
       }
     },
     {
@@ -20,7 +21,8 @@
       "columns": ["RG_NAME","YEAR_MONTH","XM_NAME","YSS","BYS_JE","BYLJS_JE"],
       "amount_col": "BYS_JE",
       "default_filters": ["XM_NAME LIKE '%合%计%'"],
-      "sql_template": "SELECT {columns} FROM {table} WHERE {filters}"
+      "sql_template": "SELECT {columns} FROM {table} WHERE {filters}",
+      "variants": {"排名": {"group_by":"RG_NAME","aggregate":"SUM({amount_col})","order":"DESC","limit":20}, "预算执行": {"columns_add":["YSS","BYLJS_JE"]}}
     },
     {
       "id": "ybggys_income_yoy", "name": "一般公共预算收入同比", "intent": "同比对比",

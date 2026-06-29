@@ -1,0 +1,17 @@
+{
+  "metrics": [
+    {
+      "id": "zfxjj_income", "name": "政府性基金收入", "intent": "完成情况",
+      "table": "RDYS_LD_YSZX_ZFXJJ_QSSRWCQK",
+      "columns": ["RG_NAME","YEAR_MONTH","XM_NAME","YSW","BYS_JE","BYLJS_JE"],
+      "amount_col": "BYS_JE",
+      "default_filters": ["XM_NAME LIKE '%合%计%'"],
+      "sql_template": "SELECT {columns} FROM {table} WHERE {filters}",
+      "variants": {
+        "排名": {"group_by":"RG_NAME","aggregate":"SUM({amount_col})","order":"DESC","limit":20},
+        "同比": {"columns_add":["BYS_SNTYS","BYS_TBS","BYS_TBP"]},
+        "预算执行": {"columns_add":["YSW","BYLJS_JE"]}
+      }
+    }
+  ]
+}

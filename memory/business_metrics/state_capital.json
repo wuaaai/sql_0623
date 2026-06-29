@@ -1,0 +1,25 @@
+{
+  "metrics": [
+    {
+      "id": "gyzbjy_income", "name": "国有资本经营收入", "intent": "完成情况",
+      "table": "RDYS_LD_YSZX_GYZBJYYYSRWC",
+      "columns": ["RG_NAME","YEAR_MONTH","XM_NAME","YSS","BY_JE","LJ_JE"],
+      "amount_col": "BY_JE",
+      "default_filters": ["XM_NAME LIKE '%合%计%'"],
+      "sql_template": "SELECT {columns} FROM {table} WHERE {filters}",
+      "variants": {
+        "排名": {"group_by":"RG_NAME","aggregate":"SUM({amount_col})","order":"DESC","limit":20},
+        "同比": {"columns_add":["BY_SNTYS","BY_TBE","BY_TBBFS"]},
+        "预算执行": {"columns_add":["YSS","BYLJS_JE"]}
+      }
+    },
+    {
+      "id": "gyzbjy_expenditure", "name": "国有资本经营支出", "intent": "完成情况",
+      "table": "RDYS_LD_YSZX_GYZBJYYYZCWC",
+      "columns": ["RG_NAME","YEAR_MONTH","XM_NAME","YSS","BY_JE","LJ_JE"],
+      "amount_col": "BY_JE",
+      "default_filters": ["XM_NAME LIKE '%合%计%'"],
+      "sql_template": "SELECT {columns} FROM {table} WHERE {filters}"
+    }
+  ]
+}
