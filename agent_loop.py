@@ -38,6 +38,7 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
 
     turn = 0
     final_answer = ""
+    tool_notify_count = 0  # 跨轮次全局计数，最多通知3次
 
     while turn < max_turns:
         turn += 1
@@ -56,7 +57,6 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
         # 收集流式响应
         assistant_content = ""
         tool_call_data = {}
-        tool_notify_count = 0  # 通知计数，最多3次
         for chunk in stream:
             delta = chunk.choices[0].delta if chunk.choices else None
             if delta is None:
