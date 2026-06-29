@@ -56,6 +56,7 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
         # 收集流式响应
         assistant_content = ""
         tool_call_data = {}  # index -> {id, name, arguments}
+        first_tool_notified = False
         for chunk in stream:
             delta = chunk.choices[0].delta if chunk.choices else None
             if delta is None:
@@ -64,7 +65,7 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
             if delta.content:
                 assistant_content += delta.content
                 yield delta.content
-            # 工具调用
+            # 工具调用检测
             if delta.tool_calls:
                 for tc in delta.tool_calls:
                     idx = tc.index
@@ -77,6 +78,14 @@ def agent_runner_loop(client, system_prompt: str, user_input: str,
                             tool_call_data[idx]["name"] += tc.function.name
                         if tc.function.arguments:
                             tool_call_data[idx]["arguments"] += tc.function.arguments
+                # 首次检测到工具调用时，发送进度通知
+                if not first_tool_notified and tool_call_data:
+                    first_tool_notified = True
+                    tool_names = [td["name"] for td in tool_call_data.values() if td["name"]]
+                    if any("rag" in n.lower() or "search" in n.lower() for n in tool_names):
+                        yield "\n> 正在检索知识库，请稍候...\n\n"
+                    else:
+                        yield "\n> 正在查询数据库，请稍候...\n\n"
 
         # 没有工具调用 → LLM 给出了最终回答
         if not tool_call_data:
